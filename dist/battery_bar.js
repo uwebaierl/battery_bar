@@ -658,6 +658,7 @@ function styles() {
 
       ha-card {
         background: var(--bb-card-bg);
+        color: var(--bb-text);
         box-shadow: none !important;
         border: 0 !important;
       }
@@ -669,6 +670,7 @@ function styles() {
         grid-template-columns: var(--bb-columns);
         align-items: stretch;
         background: var(--bb-track-bg);
+        color: var(--bb-text);
         border-radius: var(--bb-radius);
         overflow: hidden;
       }
@@ -725,7 +727,7 @@ function styles() {
         margin: 0;
         border: 0;
         background: transparent;
-        color: inherit;
+        color: var(--bb-text);
         font: inherit;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;

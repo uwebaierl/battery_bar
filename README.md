@@ -21,16 +21,39 @@ Battery Bar is a compact Home Assistant Lovelace custom card that displays a sum
 
 ## Installation
 
-### HACS
+### HACS (Recommended)
 
-1. Add this repository as a custom HACS repository with category `Dashboard`.
-2. Install **Battery Bar**.
-3. Reload the Home Assistant frontend.
+- Add this repository via the link in Home Assistant.
 
-If HACS does not add the resource automatically, add:
+[![Open your Home Assistant instance and open this repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=uwebaierl&repository=battery_bar&category=plugin)
+
+- **Battery Bar** should now be available in HACS. Click `INSTALL`.
+- The Lovelace resource is usually added automatically.
+- Reload the Home Assistant frontend if prompted.
+
+### HACS (manual)
+
+1. Ensure HACS is installed.
+2. Open HACS and add `https://github.com/uwebaierl/battery_bar` as a custom repository.
+3. Select category `Dashboard`.
+4. Search for **Battery Bar** and install it.
+5. Reload resources if prompted.
+
+If HACS does not add the resource automatically, add this Dashboard resource manually:
 
 ```yaml
-url: /hacsfiles/<repository-name>/battery_bar.js
+url: /hacsfiles/battery_bar/battery_bar.js
+type: module
+```
+
+### Manual Installation
+
+1. Download `battery_bar.js` from the [Releases](../../releases) page.
+2. Upload it to `www/community/battery_bar/` in your Home Assistant config directory.
+3. Add this resource in Dashboard configuration:
+
+```yaml
+url: /local/community/battery_bar/battery_bar.js
 type: module
 ```
 

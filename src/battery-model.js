@@ -9,7 +9,26 @@ const DEFAULT_METRIC_ICONS = {
 
 export function collectRelevantEntities(config) {
   const entities = config?.entities || {};
-  return Object.values(entities)
+  const ids = [
+    entities.battery_charge,
+    entities.battery_discharge,
+    entities.summary_soc,
+    entities.summary_energy,
+    entities.summary_device_temperature,
+    entities.battery1_soc,
+    entities.battery1_temp,
+    entities.battery1_voltage,
+  ];
+
+  if ((config?.battery_count || 2) === 2) {
+    ids.push(
+      entities.battery2_soc,
+      entities.battery2_temp,
+      entities.battery2_voltage,
+    );
+  }
+
+  return ids
     .filter((entityId) => typeof entityId === "string" && entityId.length > 0);
 }
 
@@ -29,6 +48,7 @@ export function computeEntitySignature(hass, entityIds) {
 export function buildCardModel(config, hass) {
   const entities = config?.entities || {};
   const decimals = config?.decimals || {};
+  const batteryCount = config?.battery_count || 2;
 
   return {
     summary: {
@@ -51,13 +71,15 @@ export function buildCardModel(config, hass) {
         buildMetricView(hass, entities.battery1_temp, "temperature", decimals.temperature, "Battery 1 max cell temperature"),
       ],
     },
-    battery2: {
-      primary: buildMetricView(hass, entities.battery2_soc, "soc", decimals.soc, "Battery 2 state of charge"),
-      chips: [
-        buildMetricView(hass, entities.battery2_voltage, "voltage", decimals.voltage, "Battery 2 total voltage"),
-        buildMetricView(hass, entities.battery2_temp, "temperature", decimals.temperature, "Battery 2 max cell temperature"),
-      ],
-    },
+    battery2: batteryCount === 2
+      ? {
+        primary: buildMetricView(hass, entities.battery2_soc, "soc", decimals.soc, "Battery 2 state of charge"),
+        chips: [
+          buildMetricView(hass, entities.battery2_voltage, "voltage", decimals.voltage, "Battery 2 total voltage"),
+          buildMetricView(hass, entities.battery2_temp, "temperature", decimals.temperature, "Battery 2 max cell temperature"),
+        ],
+      }
+      : null,
   };
 }
 

@@ -38,6 +38,7 @@ type: module
 
 ```yaml
 type: custom:battery-bar
+battery_count: 2
 bar_height: 56
 corner_radius: 28
 track_blend: 0.2
@@ -73,6 +74,7 @@ colors:
 | Option                     | Default           | Notes                                                                 |
 | -------------------------- | ----------------- | --------------------------------------------------------------------- |
 | `type`                     | required          | Must be `custom:battery-bar`                                          |
+| `battery_count`            | `2`               | Set to `1` to hide the second battery section                         |
 | `bar_height`               | `56`              | Clamp range `24..72`                                                  |
 | `corner_radius`            | `28`              | Clamp range `0..30`                                                   |
 | `track_blend`              | `0.2`             | Controls how strongly charge or discharge colors blend into the track |

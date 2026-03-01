@@ -4,6 +4,7 @@ export const CARD_NAME = "Battery Bar";
 
 export const DEFAULT_CONFIG = {
   type: CARD_TYPE,
+  battery_count: 2,
   bar_height: 56,
   corner_radius: 28,
   track_blend: 0.2,

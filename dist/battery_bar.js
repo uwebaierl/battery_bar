@@ -11,7 +11,26 @@ const DEFAULT_METRIC_ICONS = {
 
 function collectRelevantEntities(config) {
   const entities = config?.entities || {};
-  return Object.values(entities)
+  const ids = [
+    entities.battery_charge,
+    entities.battery_discharge,
+    entities.summary_soc,
+    entities.summary_energy,
+    entities.summary_device_temperature,
+    entities.battery1_soc,
+    entities.battery1_temp,
+    entities.battery1_voltage,
+  ];
+
+  if ((config?.battery_count || 2) === 2) {
+    ids.push(
+      entities.battery2_soc,
+      entities.battery2_temp,
+      entities.battery2_voltage,
+    );
+  }
+
+  return ids
     .filter((entityId) => typeof entityId === "string" && entityId.length > 0);
 }
 
@@ -31,6 +50,7 @@ function computeEntitySignature(hass, entityIds) {
 function buildCardModel(config, hass) {
   const entities = config?.entities || {};
   const decimals = config?.decimals || {};
+  const batteryCount = config?.battery_count || 2;
 
   return {
     summary: {
@@ -53,13 +73,15 @@ function buildCardModel(config, hass) {
         buildMetricView(hass, entities.battery1_temp, "temperature", decimals.temperature, "Battery 1 max cell temperature"),
       ],
     },
-    battery2: {
-      primary: buildMetricView(hass, entities.battery2_soc, "soc", decimals.soc, "Battery 2 state of charge"),
-      chips: [
-        buildMetricView(hass, entities.battery2_voltage, "voltage", decimals.voltage, "Battery 2 total voltage"),
-        buildMetricView(hass, entities.battery2_temp, "temperature", decimals.temperature, "Battery 2 max cell temperature"),
-      ],
-    },
+    battery2: batteryCount === 2
+      ? {
+        primary: buildMetricView(hass, entities.battery2_soc, "soc", decimals.soc, "Battery 2 state of charge"),
+        chips: [
+          buildMetricView(hass, entities.battery2_voltage, "voltage", decimals.voltage, "Battery 2 total voltage"),
+          buildMetricView(hass, entities.battery2_temp, "temperature", decimals.temperature, "Battery 2 max cell temperature"),
+        ],
+      }
+      : null,
   };
 }
 
@@ -174,6 +196,7 @@ const CARD_NAME = "Battery Bar";
 
 const DEFAULT_CONFIG = {
   type: CARD_TYPE,
+  battery_count: 2,
   bar_height: 56,
   corner_radius: 28,
   track_blend: 0.2,
@@ -234,6 +257,7 @@ function validateConfig(config) {
     throw new Error(`Card type must be '${CARD_TYPE}'.`);
   }
 
+  validateIntegerRange(config.battery_count, "battery_count", 1, 2);
   validateRange(config.bar_height, "bar_height", 24, 72);
   validateRange(config.corner_radius, "corner_radius", 0, 30);
   validateRange(config.track_blend, "track_blend", 0.15, 0.3);
@@ -278,6 +302,7 @@ function normalizeConfig(config) {
 
   return {
     type: CARD_TYPE,
+    battery_count: clampInteger(source.battery_count, 1, 2, DEFAULT_CONFIG.battery_count),
     bar_height: clampNumber(source.bar_height, 24, 72, DEFAULT_CONFIG.bar_height),
     corner_radius: clampNumber(source.corner_radius, 0, 30, DEFAULT_CONFIG.corner_radius),
     track_blend: clampNumber(source.track_blend, 0.15, 0.3, DEFAULT_CONFIG.track_blend),
@@ -334,6 +359,14 @@ function validateIntegerRange(value, key, min, max) {
 function clampNumber(value, min, max, fallback) {
   const n = Number(value);
   if (!Number.isFinite(n)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, n));
+}
+
+function clampInteger(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isInteger(n)) {
     return fallback;
   }
   return Math.min(max, Math.max(min, n));
@@ -478,6 +511,8 @@ class BatteryBarCard extends HTMLElement {
 
     this._refs = {
       shell: this.shadowRoot.querySelector(".shell"),
+      battery1Section: this.shadowRoot.querySelector('[aria-label="Battery 1"]'),
+      battery2Section: this.shadowRoot.querySelector('[aria-label="Battery 2"]'),
       summaryPrimary: this.shadowRoot.querySelector('[data-ref="summary-primary"]'),
       summaryEnergy: this.shadowRoot.querySelector('[data-ref="summary-energy"]'),
       summaryDeviceTemperature: this.shadowRoot.querySelector('[data-ref="summary-device-temperature"]'),
@@ -491,7 +526,17 @@ class BatteryBarCard extends HTMLElement {
   }
 
   _renderModel() {
-    const model = buildCardModel(this._config || DEFAULT_CONFIG, this._hass);
+    const config = this._config || DEFAULT_CONFIG;
+    const model = buildCardModel(config, this._hass);
+    const singleBattery = config.battery_count === 1;
+
+    this.style.setProperty("--bb-columns", "minmax(0, 1.12fr) minmax(0, 1fr) minmax(0, 1fr)");
+    if (this._refs.battery1Section) {
+      this._refs.battery1Section.style.gridColumn = singleBattery ? "2 / 4" : "";
+    }
+    if (this._refs.battery2Section) {
+      this._refs.battery2Section.style.display = singleBattery ? "none" : "";
+    }
 
     applyMetric(this._refs.summaryPrimary, model.summary.primary);
     applyMetric(this._refs.summaryEnergy, model.summary.chips[0]);
@@ -499,9 +544,11 @@ class BatteryBarCard extends HTMLElement {
     applyMetric(this._refs.battery1Primary, model.battery1.primary);
     applyMetric(this._refs.battery1Voltage, model.battery1.chips[0]);
     applyMetric(this._refs.battery1Temp, model.battery1.chips[1]);
-    applyMetric(this._refs.battery2Primary, model.battery2.primary);
-    applyMetric(this._refs.battery2Voltage, model.battery2.chips[0]);
-    applyMetric(this._refs.battery2Temp, model.battery2.chips[1]);
+    if (model.battery2) {
+      applyMetric(this._refs.battery2Primary, model.battery2.primary);
+      applyMetric(this._refs.battery2Voltage, model.battery2.chips[0]);
+      applyMetric(this._refs.battery2Temp, model.battery2.chips[1]);
+    }
   }
 
   _applyTheme() {
@@ -595,6 +642,7 @@ function styles() {
         --bb-radius: 28px;
         --bb-card-bg: transparent;
         --bb-track-bg: #eaecef;
+        --bb-columns: minmax(0, 1.12fr) minmax(0, 1fr) minmax(0, 1fr);
         --bb-text: #2e2e2e;
         --bb-line-gap: 3px;
         --bb-primary-font-summary: 19px;
@@ -618,7 +666,7 @@ function styles() {
         width: 100%;
         height: var(--bb-bar-height);
         display: grid;
-        grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-columns: var(--bb-columns);
         align-items: stretch;
         background: var(--bb-track-bg);
         border-radius: var(--bb-radius);

@@ -9,6 +9,7 @@ export function validateConfig(config) {
     throw new Error(`Card type must be '${CARD_TYPE}'.`);
   }
 
+  validateIntegerRange(config.battery_count, "battery_count", 1, 2);
   validateRange(config.bar_height, "bar_height", 24, 72);
   validateRange(config.corner_radius, "corner_radius", 0, 30);
   validateRange(config.track_blend, "track_blend", 0.15, 0.3);
@@ -53,6 +54,7 @@ export function normalizeConfig(config) {
 
   return {
     type: CARD_TYPE,
+    battery_count: clampInteger(source.battery_count, 1, 2, DEFAULT_CONFIG.battery_count),
     bar_height: clampNumber(source.bar_height, 24, 72, DEFAULT_CONFIG.bar_height),
     corner_radius: clampNumber(source.corner_radius, 0, 30, DEFAULT_CONFIG.corner_radius),
     track_blend: clampNumber(source.track_blend, 0.15, 0.3, DEFAULT_CONFIG.track_blend),
@@ -109,6 +111,14 @@ function validateIntegerRange(value, key, min, max) {
 function clampNumber(value, min, max, fallback) {
   const n = Number(value);
   if (!Number.isFinite(n)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, n));
+}
+
+function clampInteger(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isInteger(n)) {
     return fallback;
   }
   return Math.min(max, Math.max(min, n));

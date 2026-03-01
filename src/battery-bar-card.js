@@ -118,6 +118,8 @@ export class BatteryBarCard extends HTMLElement {
 
     this._refs = {
       shell: this.shadowRoot.querySelector(".shell"),
+      battery1Section: this.shadowRoot.querySelector('[aria-label="Battery 1"]'),
+      battery2Section: this.shadowRoot.querySelector('[aria-label="Battery 2"]'),
       summaryPrimary: this.shadowRoot.querySelector('[data-ref="summary-primary"]'),
       summaryEnergy: this.shadowRoot.querySelector('[data-ref="summary-energy"]'),
       summaryDeviceTemperature: this.shadowRoot.querySelector('[data-ref="summary-device-temperature"]'),
@@ -131,7 +133,17 @@ export class BatteryBarCard extends HTMLElement {
   }
 
   _renderModel() {
-    const model = buildCardModel(this._config || DEFAULT_CONFIG, this._hass);
+    const config = this._config || DEFAULT_CONFIG;
+    const model = buildCardModel(config, this._hass);
+    const singleBattery = config.battery_count === 1;
+
+    this.style.setProperty("--bb-columns", "minmax(0, 1.12fr) minmax(0, 1fr) minmax(0, 1fr)");
+    if (this._refs.battery1Section) {
+      this._refs.battery1Section.style.gridColumn = singleBattery ? "2 / 4" : "";
+    }
+    if (this._refs.battery2Section) {
+      this._refs.battery2Section.style.display = singleBattery ? "none" : "";
+    }
 
     applyMetric(this._refs.summaryPrimary, model.summary.primary);
     applyMetric(this._refs.summaryEnergy, model.summary.chips[0]);
@@ -139,9 +151,11 @@ export class BatteryBarCard extends HTMLElement {
     applyMetric(this._refs.battery1Primary, model.battery1.primary);
     applyMetric(this._refs.battery1Voltage, model.battery1.chips[0]);
     applyMetric(this._refs.battery1Temp, model.battery1.chips[1]);
-    applyMetric(this._refs.battery2Primary, model.battery2.primary);
-    applyMetric(this._refs.battery2Voltage, model.battery2.chips[0]);
-    applyMetric(this._refs.battery2Temp, model.battery2.chips[1]);
+    if (model.battery2) {
+      applyMetric(this._refs.battery2Primary, model.battery2.primary);
+      applyMetric(this._refs.battery2Voltage, model.battery2.chips[0]);
+      applyMetric(this._refs.battery2Temp, model.battery2.chips[1]);
+    }
   }
 
   _applyTheme() {
@@ -235,6 +249,7 @@ function styles() {
         --bb-radius: 28px;
         --bb-card-bg: transparent;
         --bb-track-bg: #eaecef;
+        --bb-columns: minmax(0, 1.12fr) minmax(0, 1fr) minmax(0, 1fr);
         --bb-text: #2e2e2e;
         --bb-line-gap: 3px;
         --bb-primary-font-summary: 19px;
@@ -258,7 +273,7 @@ function styles() {
         width: 100%;
         height: var(--bb-bar-height);
         display: grid;
-        grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-columns: var(--bb-columns);
         align-items: stretch;
         background: var(--bb-track-bg);
         border-radius: var(--bb-radius);

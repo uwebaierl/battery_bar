@@ -4,14 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project uses Semantic Versioning.
 
-## [Unreleased]
+## [1.0.0] - 2026-03-02
 
 ### Added
 - Added `battery_count` with support for one-battery and two-battery layouts.
 - Kept the summary column width fixed when rendering the one-battery layout.
+- Added summary device temperature and dynamic track styling for charge, discharge, and idle states.
 
 ### Changed
 - Refreshed the README installation instructions with recommended HACS, manual HACS, and manual installation flows.
+- Added README screenshots and fixed text color application in the card.
 
 ## [0.1.0] - 2026-03-01
 

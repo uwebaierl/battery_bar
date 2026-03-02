@@ -1,5 +1,9 @@
 # Battery Bar
 
+[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/)
+[![Release](https://img.shields.io/github/v/release/uwebaierl/battery_bar)](https://github.com/uwebaierl/battery_bar/releases)
+[![License](https://img.shields.io/github/license/uwebaierl/battery_bar)](LICENSE)
+
 ## Screenshots
 
 <img width="70%" height="auto" alt="Battery Bar Overview" src="https://raw.githubusercontent.com/uwebaierl/battery_bar/main/docs/images/battery_bar_01.png" />

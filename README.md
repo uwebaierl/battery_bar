@@ -2,8 +2,8 @@
 
 ## Screenshots
 
-<img width="49%" height="auto" alt="Battery Bar Overview" src="https://github.com/uwebaierl/battery_bar/blob/main/docs/images/battery_bar_01.png" />
-<img width="49%" height="auto" alt="Battery Bar Editor" src="https://github.com/uwebaierl/battery_bar/blob/main/docs/images/battery_bar_02.png" />
+<img width="70%" height="auto" alt="Battery Bar Overview" src="https://github.com/uwebaierl/battery_bar/blob/main/docs/images/battery_bar_01.png" />
+<img width="70%" height="auto" alt="Battery Bar Editor" src="https://github.com/uwebaierl/battery_bar/blob/main/docs/images/battery_bar_02.png" />
 
 Battery Bar is a compact Home Assistant Lovelace custom card that displays a summary battery state plus two individual battery columns in a fixed-height bar layout.
 

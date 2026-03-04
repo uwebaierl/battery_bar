@@ -396,6 +396,9 @@ function normalizeEntity(value, fallback) {
 
 /* src/battery-bar-card.js */
 const FIXED_LINE_GAP_PX = 3;
+const COLOR_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+const COLOR_TRANSITION = `260ms ${COLOR_EASING}`;
+const PRIMARY_SETTLE_DURATION_MS = 220;
 
 class BatteryBarCard extends HTMLElement {
   constructor() {
@@ -538,14 +541,14 @@ class BatteryBarCard extends HTMLElement {
       this._refs.battery2Section.style.display = singleBattery ? "none" : "";
     }
 
-    applyMetric(this._refs.summaryPrimary, model.summary.primary);
+    applyMetric(this._refs.summaryPrimary, model.summary.primary, { settleOnChange: true });
     applyMetric(this._refs.summaryEnergy, model.summary.chips[0]);
     applyMetric(this._refs.summaryDeviceTemperature, model.summary.chips[1]);
-    applyMetric(this._refs.battery1Primary, model.battery1.primary);
+    applyMetric(this._refs.battery1Primary, model.battery1.primary, { settleOnChange: true });
     applyMetric(this._refs.battery1Voltage, model.battery1.chips[0]);
     applyMetric(this._refs.battery1Temp, model.battery1.chips[1]);
     if (model.battery2) {
-      applyMetric(this._refs.battery2Primary, model.battery2.primary);
+      applyMetric(this._refs.battery2Primary, model.battery2.primary, { settleOnChange: true });
       applyMetric(this._refs.battery2Voltage, model.battery2.chips[0]);
       applyMetric(this._refs.battery2Temp, model.battery2.chips[1]);
     }
@@ -594,16 +597,19 @@ class BatteryBarCard extends HTMLElement {
   }
 }
 
-function applyMetric(button, metric) {
+function applyMetric(button, metric, options = {}) {
   if (!button) {
     return;
   }
 
+  const nextValue = metric?.value || "—";
+  const previousValue = button.dataset.metricValue || "";
   const valueEl = button.querySelector(".metric-text");
   if (valueEl) {
-    valueEl.textContent = metric?.value || "—";
+    valueEl.textContent = nextValue;
   }
 
+  button.dataset.metricValue = nextValue;
   button.dataset.entityId = metric?.entityId || "";
   button.disabled = !metric?.available;
   button.title = metric?.title || "";
@@ -620,6 +626,10 @@ function applyMetric(button, metric) {
       iconEl.hidden = true;
     }
   }
+
+  if (options.settleOnChange && shouldAnimatePrimarySettle(previousValue, nextValue)) {
+    animatePrimarySettle(button);
+  }
 }
 
 function buildMetricButton(ref, primary) {
@@ -631,6 +641,36 @@ function buildMetricButton(ref, primary) {
       <span class="metric-text">—</span>
     </button>
   `;
+}
+
+function shouldAnimatePrimarySettle(previousValue, nextValue) {
+  return Boolean(previousValue)
+    && previousValue !== nextValue
+    && previousValue !== "—"
+    && nextValue !== "—";
+}
+
+function animatePrimarySettle(button) {
+  if (!button?.animate) {
+    return;
+  }
+  button.getAnimations().forEach((animation) => {
+    if (animation.id === "primary-settle") {
+      animation.cancel();
+    }
+  });
+  const animation = button.animate(
+    [
+      { transform: "translateY(1.5px)", opacity: 0.84 },
+      { transform: "translateY(0)", opacity: 1 },
+    ],
+    {
+      duration: PRIMARY_SETTLE_DURATION_MS,
+      easing: COLOR_EASING,
+      fill: "none",
+    },
+  );
+  animation.id = "primary-settle";
 }
 
 function styles() {
@@ -659,6 +699,7 @@ function styles() {
       ha-card {
         background: var(--bb-card-bg);
         color: var(--bb-text);
+        transition: background-color ${COLOR_TRANSITION}, color ${COLOR_TRANSITION};
         box-shadow: none !important;
         border: 0 !important;
       }
@@ -671,6 +712,7 @@ function styles() {
         align-items: stretch;
         background: var(--bb-track-bg);
         color: var(--bb-text);
+        transition: background-color ${COLOR_TRANSITION}, color ${COLOR_TRANSITION};
         border-radius: var(--bb-radius);
         overflow: hidden;
       }

@@ -18,6 +18,14 @@ Battery Bar is a compact Home Assistant Lovelace custom card that displays a sum
 - Theme-friendly styling for light and dark dashboards
 - Fixed card background plus dynamic blended track color
 
+## Combined Setup
+
+Battery Bar works well together with [PowerFlow Bar](https://github.com/uwebaierl/powerflow_bar) when you want a compact flow overview above a focused battery status row.
+
+<img width="100%" height="auto" alt="Battery Bar and PowerFlow Bar combined" src="https://raw.githubusercontent.com/uwebaierl/battery_bar/main/docs/images/battery_bar_combined_01.png" />
+
+If you want a matching flow card for PV, home, battery, and grid power, see the [PowerFlow Bar repository](https://github.com/uwebaierl/powerflow_bar).
+
 ## Installation
 
 ### HACS (Recommended)

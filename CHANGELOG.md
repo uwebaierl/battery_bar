@@ -4,10 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project uses Semantic Versioning.
 
-## [Unreleased]
+## [1.1.0] - 2026-03-04
 
-### Added
-- Added a built-in Lovelace editor with grouped Summary and Batteries sections, plus controls for layout, colors, and decimals.
+### Changed
+- Added a built-in Lovelace editor with separate Summary and Batteries sections.
+- Grouped Battery 1 and Battery 2 settings into one editor section with shared structure.
+- Added editor controls for layout, colors, decimals, and battery count.
+- Kept the editor aligned with the existing nested YAML structure for `entities`, `decimals`, and `colors`.
+- Updated documentation to reflect editor support.
 
 ## [1.0.1] - 2026-03-02
 

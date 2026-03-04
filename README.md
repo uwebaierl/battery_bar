@@ -17,6 +17,7 @@ Battery Bar is a compact Home Assistant Lovelace custom card that displays a sum
 - Per-metric decimal controls
 - Theme-friendly styling for light and dark dashboards
 - Fixed card background plus dynamic blended track color
+- Adjustable height and corner radius to match [Bubble Card](https://github.com/Clooos/Bubble-Card) layouts cleanly
 
 ## Combined Setup
 

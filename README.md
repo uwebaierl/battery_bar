@@ -2,8 +2,8 @@
 
 ## Screenshots
 
-<img width="100%" height="auto" alt="Battery Bar Overview" src="https://raw.githubusercontent.com/uwebaierl/battery_bar/main/docs/images/battery_bar_01.png" />
-<img width="100%" height="auto" alt="Battery Bar Editor" src="https://raw.githubusercontent.com/uwebaierl/battery_bar/main/docs/images/battery_bar_02.png" />
+<img style="max-width: 1000px; width: 100%; height: auto;" alt="Battery Bar Overview" src="https://raw.githubusercontent.com/uwebaierl/battery_bar/main/docs/images/battery_bar_01.png" />
+<img style="max-width: 1000px; width: 100%; height: auto;" alt="Battery Bar Editor" src="https://raw.githubusercontent.com/uwebaierl/battery_bar/main/docs/images/battery_bar_02.png" />
 
 Battery Bar is a compact Home Assistant Lovelace custom card that displays a summary battery state plus two individual battery columns in a fixed-height bar layout.
 
@@ -24,7 +24,7 @@ Battery Bar is a compact Home Assistant Lovelace custom card that displays a sum
 
 Battery Bar works well together with [PowerFlow Bar](https://github.com/uwebaierl/powerflow_bar) when you want a compact flow overview above a focused battery status row.
 
-<img width="100%" height="auto" alt="Battery Bar and PowerFlow Bar combined" src="https://raw.githubusercontent.com/uwebaierl/battery_bar/main/docs/images/battery_bar_combined_01.png" />
+<img style="max-width: 1000px; width: 100%; height: auto;" alt="Battery Bar and PowerFlow Bar combined" src="https://raw.githubusercontent.com/uwebaierl/battery_bar/main/docs/images/battery_bar_combined_01.png" />
 
 If you want a matching flow card for PV, home, battery, and grid power, see the [PowerFlow Bar repository](https://github.com/uwebaierl/powerflow_bar).
 

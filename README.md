@@ -96,6 +96,7 @@ colors:
   background: "#4CAF8E"
   track: "#EAECEF"
   text: "#2E2E2E"
+  divider: "#F4F7FA"
   battery_charge: "#4CAF8E"
   battery_discharge: "#2E8B75"
   battery_idle: "#9FA8B2"
@@ -120,6 +121,7 @@ colors:
 | `colors.background`        | `#4CAF8E`         | Outer card background                                                 |
 | `colors.track`             | `#EAECEF`         | Base track color before charge/discharge blending                     |
 | `colors.text`              | `#2E2E2E`         | Text and icon color                                                   |
+| `colors.divider`           | `#F4F7FA`         | Divider color between Summary, Battery 1, and Battery 2              |
 | `colors.battery_charge`    | `#4CAF8E`         | Charge accent blended into the track                                  |
 | `colors.battery_discharge` | `#2E8B75`         | Discharge accent blended into the track                               |
 | `colors.battery_idle`      | `#9FA8B2`         | Idle accent blended into the track when charge and discharge are `0`  |

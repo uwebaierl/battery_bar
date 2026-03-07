@@ -87,6 +87,7 @@ export function normalizeConfig(config) {
       background: normalizeColor(colorsInput.background, DEFAULT_CONFIG.colors.background),
       track: normalizeColor(colorsInput.track, DEFAULT_CONFIG.colors.track),
       text: normalizeColor(colorsInput.text, DEFAULT_CONFIG.colors.text),
+      divider: normalizeColor(colorsInput.divider, DEFAULT_CONFIG.colors.divider),
       battery_charge: normalizeColor(colorsInput.battery_charge, DEFAULT_CONFIG.colors.battery_charge),
       battery_discharge: normalizeColor(colorsInput.battery_discharge, DEFAULT_CONFIG.colors.battery_discharge),
       battery_idle: normalizeColor(colorsInput.battery_idle, DEFAULT_CONFIG.colors.battery_idle),

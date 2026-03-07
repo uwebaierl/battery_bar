@@ -224,6 +224,7 @@ const DEFAULT_CONFIG = {
     background: "#4CAF8E",
     track: "#EAECEF",
     text: "#2E2E2E",
+    divider: "#F4F7FA",
     battery_charge: "#4CAF8E",
     battery_discharge: "#2E8B75",
     battery_idle: "#9FA8B2",
@@ -245,7 +246,7 @@ const ENTITY_KEYS = [
 ];
 
 const DECIMAL_KEYS = ["soc", "energy", "temperature", "voltage"];
-const COLOR_KEYS = ["background", "track", "text", "battery_charge", "battery_discharge", "battery_idle"];
+const COLOR_KEYS = ["background", "track", "text", "divider", "battery_charge", "battery_discharge", "battery_idle"];
 
 /* src/validate.js */
 function validateConfig(config) {
@@ -335,6 +336,7 @@ function normalizeConfig(config) {
       background: normalizeColor(colorsInput.background, DEFAULT_CONFIG.colors.background),
       track: normalizeColor(colorsInput.track, DEFAULT_CONFIG.colors.track),
       text: normalizeColor(colorsInput.text, DEFAULT_CONFIG.colors.text),
+      divider: normalizeColor(colorsInput.divider, DEFAULT_CONFIG.colors.divider),
       battery_charge: normalizeColor(colorsInput.battery_charge, DEFAULT_CONFIG.colors.battery_charge),
       battery_discharge: normalizeColor(colorsInput.battery_discharge, DEFAULT_CONFIG.colors.battery_discharge),
       battery_idle: normalizeColor(colorsInput.battery_idle, DEFAULT_CONFIG.colors.battery_idle),
@@ -466,6 +468,7 @@ const FIELD_HELP = {
   background: "Outer card background color.",
   track: "Base track color before state blending.",
   text: "Text and icon color.",
+  divider: "Divider color between the three segments.",
   battery_charge: "Track accent color while charging.",
   battery_discharge: "Track accent color while discharging.",
   battery_idle: "Track accent color while idle.",
@@ -644,8 +647,8 @@ class BatteryBarCard extends HTMLElement {
     this.style.setProperty("--bb-line-gap", `${FIXED_LINE_GAP_PX}px`);
     this.style.setProperty("--bb-primary-font-summary", `${clamp(16, config.bar_height * 0.33, 20)}px`);
     this.style.setProperty("--bb-primary-font-battery", `${clamp(15, (config.bar_height * 0.33) - 1, 19)}px`);
-    this.style.setProperty("--bb-chip-font", `${clamp(10, config.bar_height * 0.19, 12)}px`);
-    this.style.setProperty("--bb-divider", blendHex(colors.track, colors.text, 0.92));
+    this.style.setProperty("--bb-chip-font", "12px");
+    this.style.setProperty("--bb-divider", colors.divider);
   }
 
   _handleClick(event) {
@@ -1109,8 +1112,8 @@ function styles() {
         --bb-line-gap: 3px;
         --bb-primary-font-summary: 19px;
         --bb-primary-font-battery: 18px;
-        --bb-chip-font: 11px;
-        --bb-divider: rgba(46, 46, 46, 0.12);
+        --bb-chip-font: 12px;
+        --bb-divider: #f4f7fa;
         color: var(--bb-text);
       }
 

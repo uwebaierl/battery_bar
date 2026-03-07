@@ -81,6 +81,7 @@ const FIELD_HELP = {
   background: "Outer card background color.",
   track: "Base track color before state blending.",
   text: "Text and icon color.",
+  divider: "Divider color between the three segments.",
   battery_charge: "Track accent color while charging.",
   battery_discharge: "Track accent color while discharging.",
   battery_idle: "Track accent color while idle.",
@@ -259,8 +260,8 @@ export class BatteryBarCard extends HTMLElement {
     this.style.setProperty("--bb-line-gap", `${FIXED_LINE_GAP_PX}px`);
     this.style.setProperty("--bb-primary-font-summary", `${clamp(16, config.bar_height * 0.33, 20)}px`);
     this.style.setProperty("--bb-primary-font-battery", `${clamp(15, (config.bar_height * 0.33) - 1, 19)}px`);
-    this.style.setProperty("--bb-chip-font", `${clamp(10, config.bar_height * 0.19, 12)}px`);
-    this.style.setProperty("--bb-divider", blendHex(colors.track, colors.text, 0.92));
+    this.style.setProperty("--bb-chip-font", "12px");
+    this.style.setProperty("--bb-divider", colors.divider);
   }
 
   _handleClick(event) {
@@ -724,8 +725,8 @@ function styles() {
         --bb-line-gap: 3px;
         --bb-primary-font-summary: 19px;
         --bb-primary-font-battery: 18px;
-        --bb-chip-font: 11px;
-        --bb-divider: rgba(46, 46, 46, 0.12);
+        --bb-chip-font: 12px;
+        --bb-divider: #f4f7fa;
         color: var(--bb-text);
       }
 

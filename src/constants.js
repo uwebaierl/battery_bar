@@ -32,6 +32,7 @@ export const DEFAULT_CONFIG = {
     background: "#4CAF8E",
     track: "#EAECEF",
     text: "#2E2E2E",
+    divider: "#F4F7FA",
     battery_charge: "#4CAF8E",
     battery_discharge: "#2E8B75",
     battery_idle: "#9FA8B2",
@@ -53,4 +54,4 @@ export const ENTITY_KEYS = [
 ];
 
 export const DECIMAL_KEYS = ["soc", "energy", "temperature", "voltage"];
-export const COLOR_KEYS = ["background", "track", "text", "battery_charge", "battery_discharge", "battery_idle"];
+export const COLOR_KEYS = ["background", "track", "text", "divider", "battery_charge", "battery_discharge", "battery_idle"];

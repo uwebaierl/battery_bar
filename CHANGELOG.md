@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this project uses Semantic Versioning.
 
+## [Unreleased]
+
+### Changed
+- Added configurable `colors.divider` for segment separators (YAML + editor + runtime).
+- Switched divider rendering to use `colors.divider` instead of deriving from track/text colors.
+- Set second-row chip font size to a fixed `12px`.
+- Updated README examples/options to document `colors.divider`.
+
 ## [1.1.0] - 2026-03-04
 
 ### Changed

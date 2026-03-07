@@ -12,12 +12,9 @@ Battery Bar is a compact Home Assistant Lovelace custom card that displays a sum
 - Three-column layout: Summary, Battery 1, Battery 2
 - Primary SoC value with compact secondary metrics
 - Nested YAML configuration with `entities`, `decimals`, and `colors`
+- Per-metric decimal controls
 - Built-in visual editor with separate Summary and Batteries sections
 - Individually clickable values that open Home Assistant `more-info`
-- Graceful handling of `unknown` and `unavailable` sensor states
-- Per-metric decimal controls
-- Theme-friendly styling for light and dark dashboards
-- Fixed card background plus dynamic blended track color
 - Adjustable height and corner radius to match [Bubble Card](https://github.com/Clooos/Bubble-Card) layouts cleanly
 
 ## Combined Setup
@@ -104,27 +101,27 @@ colors:
 
 ## Options
 
-| Option                     | Default           | Notes                                                                 |
-| -------------------------- | ----------------- | --------------------------------------------------------------------- |
-| `type`                     | required          | Must be `custom:battery-bar`                                          |
-| `battery_count`            | `2`               | Set to `1` to hide the second battery section                         |
-| `bar_height`               | `56`              | Clamp range `24..72`                                                  |
-| `corner_radius`            | `28`              | Clamp range `0..30`                                                   |
-| `track_blend`              | `0.2`             | Controls how strongly charge or discharge colors blend into the track |
-| `background_transparent`   | `false`           | Transparent background when enabled                                   |
-| `entities.*`               | defaults provided | Entity mapping for charge/discharge, summary, and both batteries      |
-| `entities.summary_device_temperature` | default sensor | Device temperature shown next to summary energy                       |
-| `decimals.soc`             | `0`               | Clamp range `0..2`                                                    |
-| `decimals.energy`          | `2`               | Clamp range `0..2`                                                    |
-| `decimals.temperature`     | `0`               | Clamp range `0..2`                                                    |
-| `decimals.voltage`         | `1`               | Clamp range `0..2`                                                    |
-| `colors.background`        | `#4CAF8E`         | Outer card background                                                 |
-| `colors.track`             | `#EAECEF`         | Base track color before charge/discharge blending                     |
-| `colors.text`              | `#2E2E2E`         | Text and icon color                                                   |
-| `colors.divider`           | `#F4F7FA`         | Divider color between Summary, Battery 1, and Battery 2              |
-| `colors.battery_charge`    | `#4CAF8E`         | Charge accent blended into the track                                  |
-| `colors.battery_discharge` | `#2E8B75`         | Discharge accent blended into the track                               |
-| `colors.battery_idle`      | `#9FA8B2`         | Idle accent blended into the track when charge and discharge are `0`  |
+| Option                                | Default           | Notes                                                                 |
+| ------------------------------------- | ----------------- | --------------------------------------------------------------------- |
+| `type`                                | required          | Must be `custom:battery-bar`                                          |
+| `battery_count`                       | `2`               | Set to `1` to hide the second battery section                         |
+| `bar_height`                          | `56`              | Clamp range `24..72`                                                  |
+| `corner_radius`                       | `28`              | Clamp range `0..30`                                                   |
+| `track_blend`                         | `0.2`             | Controls how strongly charge or discharge colors blend into the track |
+| `background_transparent`              | `false`           | Transparent background when enabled                                   |
+| `entities.*`                          | defaults provided | Entity mapping for charge/discharge, summary, and both batteries      |
+| `entities.summary_device_temperature` | default sensor    | Device temperature shown next to summary energy                       |
+| `decimals.soc`                        | `0`               | Clamp range `0..2`                                                    |
+| `decimals.energy`                     | `2`               | Clamp range `0..2`                                                    |
+| `decimals.temperature`                | `0`               | Clamp range `0..2`                                                    |
+| `decimals.voltage`                    | `1`               | Clamp range `0..2`                                                    |
+| `colors.background`                   | `#4CAF8E`         | Outer card background                                                 |
+| `colors.track`                        | `#EAECEF`         | Base track color before charge/discharge blending                     |
+| `colors.text`                         | `#2E2E2E`         | Text and icon color                                                   |
+| `colors.divider`                      | `#F4F7FA`         | Divider color between Summary, Battery 1, and Battery 2               |
+| `colors.battery_charge`               | `#4CAF8E`         | Charge accent blended into the track                                  |
+| `colors.battery_discharge`            | `#2E8B75`         | Discharge accent blended into the track                               |
+| `colors.battery_idle`                 | `#9FA8B2`         | Idle accent blended into the track when charge and discharge are `0`  |
 
 Track color priority: `battery_discharge` > `battery_charge` > `battery_idle`.
 

@@ -258,8 +258,8 @@ export class BatteryBarCard extends HTMLElement {
     this.style.setProperty("--bb-track-bg", resolveTrackBackground(config, this._hass));
     this.style.setProperty("--bb-text", colors.text);
     this.style.setProperty("--bb-line-gap", `${FIXED_LINE_GAP_PX}px`);
-    this.style.setProperty("--bb-primary-font-summary", `${clamp(16, config.bar_height * 0.33, 20)}px`);
-    this.style.setProperty("--bb-primary-font-battery", `${clamp(15, (config.bar_height * 0.33) - 1, 19)}px`);
+    this.style.setProperty("--bb-primary-font-summary", "17px");
+    this.style.setProperty("--bb-primary-font-battery", "17px");
     this.style.setProperty("--bb-chip-font", "12px");
     this.style.setProperty("--bb-divider", colors.divider);
   }
@@ -723,8 +723,8 @@ function styles() {
         --bb-columns: minmax(0, 1.12fr) minmax(0, 1fr) minmax(0, 1fr);
         --bb-text: #2e2e2e;
         --bb-line-gap: 3px;
-        --bb-primary-font-summary: 19px;
-        --bb-primary-font-battery: 18px;
+        --bb-primary-font-summary: 17px;
+        --bb-primary-font-battery: 17px;
         --bb-chip-font: 12px;
         --bb-divider: #f4f7fa;
         color: var(--bb-text);

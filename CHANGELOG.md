@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this project uses Semantic Versionin
 ### Changed
 - Added configurable `colors.divider` for segment separators (YAML + editor + runtime).
 - Switched divider rendering to use `colors.divider` instead of deriving from track/text colors.
+- Set top-row primary font size to a fixed `17px`.
 - Set second-row chip font size to a fixed `12px`.
 - Updated README examples/options to document `colors.divider`.
 

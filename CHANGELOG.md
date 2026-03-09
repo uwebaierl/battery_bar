@@ -12,6 +12,8 @@ The format is based on Keep a Changelog and this project uses Semantic Versionin
 - Set top-row primary font size to a fixed `17px`.
 - Set second-row chip font size to a fixed `12px`.
 - Updated README examples/options to document `colors.divider`.
+- Updated README combined setup section to link both companion cards (PowerFlow Bar + House Energy Bar).
+- Replaced `battery_bar_combined_01.png` with the newer combined screenshot used by House Energy Bar.
 
 ## [1.1.0] - 2026-03-04
 

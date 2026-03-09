@@ -1,7 +1,5 @@
 # Battery Bar
 
-## Screenshots
-
 <img style="max-width: 1000px; width: 100%; height: auto;" alt="Battery Bar Overview" src="https://raw.githubusercontent.com/uwebaierl/battery_bar/main/docs/images/battery_bar_01.png" />
 <img style="max-width: 1000px; width: 100%; height: auto;" alt="Battery Bar Editor" src="https://raw.githubusercontent.com/uwebaierl/battery_bar/main/docs/images/battery_bar_02.png" />
 
@@ -74,7 +72,7 @@ battery_count: 2
 bar_height: 56
 corner_radius: 28
 track_blend: 0.2
-background_transparent: false
+background_transparent: true
 entities:
   battery_charge: sensor.battery_charge_power
   battery_discharge: sensor.battery_discharge_power
@@ -111,7 +109,7 @@ colors:
 | `bar_height`                          | `56`              | Clamp range `24..72`                                                  |
 | `corner_radius`                       | `28`              | Clamp range `0..30`                                                   |
 | `track_blend`                         | `0.2`             | Controls how strongly charge or discharge colors blend into the track |
-| `background_transparent`              | `false`           | Transparent background when enabled                                   |
+| `background_transparent`              | `true`            | Transparent background when enabled                                   |
 | `entities.*`                          | defaults provided | Entity mapping for charge/discharge, summary, and both batteries      |
 | `entities.summary_device_temperature` | default sensor    | Device temperature shown next to summary energy                       |
 | `decimals.soc`                        | `0`               | Clamp range `0..2`                                                    |

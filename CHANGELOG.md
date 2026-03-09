@@ -14,6 +14,8 @@ The format is based on Keep a Changelog and this project uses Semantic Versionin
 - Updated README examples/options to document `colors.divider`.
 - Updated README combined setup section to link both companion cards (PowerFlow Bar + House Energy Bar).
 - Replaced `battery_bar_combined_01.png` with the newer combined screenshot used by House Energy Bar.
+- Changed default `background_transparent` to `true` in code and docs.
+- Removed the `Screenshots` heading from README while keeping images in place.
 
 ## [1.1.0] - 2026-03-04
 

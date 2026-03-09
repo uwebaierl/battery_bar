@@ -200,7 +200,7 @@ const DEFAULT_CONFIG = {
   bar_height: 56,
   corner_radius: 28,
   track_blend: 0.2,
-  background_transparent: false,
+  background_transparent: true,
   entities: {
     battery_charge: "sensor.battery_charge_power",
     battery_discharge: "sensor.battery_discharge_power",

@@ -7,6 +7,8 @@ The format is based on Keep a Changelog and this project uses Semantic Versionin
 ## [Unreleased]
 
 ### Changed
+- Refactored the Lovelace editor to use Home Assistant's native `ha-form` rendering (removed custom editor CSS/markup).
+- Updated editor field labels to short, descriptive wording across layout, colors, decimals, and entities.
 - Added configurable `colors.divider` for segment separators (YAML + editor + runtime).
 - Switched divider rendering to use `colors.divider` instead of deriving from track/text colors.
 - Set top-row primary font size to a fixed `17px`.

@@ -7,18 +7,14 @@ Battery Bar is a compact Home Assistant Lovelace custom card that displays a sum
 
 ## Features
 
-- Three-column layout: Summary, Battery 1, Battery 2
-- Primary SoC value with compact secondary metrics
-- Nested YAML configuration with `entities` and `colors`
-- Global semantic `color_preset` themes shared across all three cards
-- Uses Home Assistant's own localized entity formatting and entity-level display precision
+- Summary-first battery overview with support for one or two battery columns
+- Primary SoC values with compact secondary metrics for energy, voltage, and temperature
+- Shared preset-based color themes with optional manual overrides
 - Built-in visual editor for layout, colors, and entities
-- The visual editor uses a dedicated Colors section in the same native Home Assistant expandable panel stack as layout and entities, with a preset selector and an optional custom-color override toggle
-- Visual editor automatically removes legacy config keys it knows how to migrate
-- Turning off manual color overrides makes the selected preset apply fully again
-- Individually clickable values that open Home Assistant `more-info`
-- Configured metrics stay visible as `—` when their entity is missing or unavailable, while omitted metrics are not treated as `0`
-- `battery_count: 1` works as a true single-battery mode without requiring Battery 2 entities
+- Clickable values that open Home Assistant `more-info`
+- Missing or unavailable configured entities stay visible as `—` instead of showing misleading fallback values
+- Uses Home Assistant's native localized state formatting
+- Adjustable height and corner radius to fit compact dashboard layouts
 - Adjustable height and corner radius to match [Bubble Card](https://github.com/Clooos/Bubble-Card) layouts cleanly
 
 ## Combined Setup

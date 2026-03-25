@@ -38,11 +38,21 @@ jobs:
             $0 ~ "^## \\[" version "\\]" { capture=1; next }
             /^## \[/ { if (capture) exit }
             capture { print }
-          ' CHANGELOG.md > release_notes.md
+          ' CHANGELOG.md > release_section.md
 
-          if ! grep -q '[^[:space:]]' release_notes.md; then
+          if ! grep -q '[^[:space:]]' release_section.md; then
             echo "No release notes found for version [$VERSION] in CHANGELOG.md" >&2
             exit 1
+          fi
+
+          awk '
+            /^### Release Summary$/ { capture=1; next }
+            /^### / { if (capture) exit }
+            capture { print }
+          ' release_section.md > release_notes.md
+
+          if ! grep -q '[^[:space:]]' release_notes.md; then
+            cp release_section.md release_notes.md
           fi
 
       - name: Create GitHub release and upload asset

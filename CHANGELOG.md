@@ -8,6 +8,12 @@ The format is based on Keep a Changelog and this project uses Semantic Versionin
 
 ## [1.3.0] - 2026-03-25
 
+### Release Summary
+- Added shared color presets with semantic color tokens and preset-owned `track_blend`.
+- Removed card-side icon and decimal fallback logic so icons and value formatting now come directly from Home Assistant entities.
+- Updated the visual editor with aligned form sections, seeded manual overrides, improved YAML cleanup, and a cleaner chooser/editor preview.
+- Made `battery_count: 1` a true single-battery mode.
+
 ### Changed
 - Removed the forced full-width preview placeholder wrapper so the chooser/editor description centers correctly.
 - Shortened the chooser/editor preview description so Battery Bar aligns more evenly with the other card previews.

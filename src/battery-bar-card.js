@@ -10,27 +10,72 @@ import {
   runConfigCleanup,
 } from "./_shared/config-cleanup.js";
 import { blendHex, pickBestTextColor } from "./_shared/color.js";
+import {
+  buildColorOverrideEditorState,
+  hasColorOverrides,
+  normalizeTrackBlendOverrideValue,
+  pickMappedStringValues,
+  registerCustomCardMetadata,
+  resolveEditorBackgroundColor,
+  syncEditorFormsHass,
+} from "./_shared/editor.js";
 import { openMoreInfo } from "./_shared/interaction.js";
 import { computeEntitySignature } from "./_shared/signature.js";
 import {
+  BATTERY2_ENTITY_KEYS,
   CARD_ELEMENT_TAG,
   CARD_NAME,
   CARD_TYPE,
   DEFAULT_CONFIG,
+  REQUIRED_ENTITY_KEYS,
 } from "./constants.js";
+import {
+  BATTERY_CONFIG_CLEANUP_STEPS,
+  BATTERY_EDITOR_CLEANUP_STEPS,
+} from "./migrations.js";
 import { normalizeConfig, validateConfig } from "./validate.js";
+import {
+  buildBackgroundColorField,
+  buildBoxNumberSelector,
+  buildColorTextSelector,
+  buildSliderNumberSelector,
+  EDITOR_SCHEMA_RANGE_BAR_HEIGHT,
+  EDITOR_SCHEMA_RANGE_CORNER_RADIUS,
+  EDITOR_SCHEMA_RANGE_TRACK_BLEND,
+} from "./_shared/editor-schema.js";
+import {
+  buildCardPreviewMarkup,
+  buildCardPreviewStyles,
+  hasRequiredEntityValues,
+  syncCardPreviewVisibility,
+} from "./_shared/preview.js";
+import {
+  applyEditorIncomingConfig,
+  commitEditorRawConfig,
+  createEditorCleanupState,
+  ensureSingleFormEditor,
+  renderSingleFormEditor,
+} from "./_shared/editor-controller.js";
+import {
+  applyMetricButtonState,
+  buildMetricButtonMarkup,
+} from "./_shared/metric-button.js";
 
 const FIXED_LINE_GAP_PX = 3;
 const COLOR_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const COLOR_TRANSITION = `260ms ${COLOR_EASING}`;
 const PRIMARY_SETTLE_DURATION_MS = 220;
 const EDITOR_ELEMENT_TAG = "battery-bar-editor";
-const CONFIG_CLEANUP_STEPS = [
-  migrateLegacyBatteryColors,
-];
-const EDITOR_CLEANUP_STEPS = [
-  migrateLegacyBatteryColors,
-];
+const CARD_DESCRIPTION = "Battery Bar: compact battery summary and status card for Home Assistant.";
+const BATTERY_COLOR_FIELD_MAP = {
+  track: ["track"],
+  text_light: ["text_light", "text"],
+  text_dark: ["text_dark", "text"],
+  divider: ["divider"],
+  energy_storage_in: ["energy_storage_in"],
+  energy_storage_out: ["energy_storage_out"],
+  home_load: ["home_load"],
+};
 
 export class BatteryBarCard extends HTMLElement {
   constructor() {
@@ -41,6 +86,7 @@ export class BatteryBarCard extends HTMLElement {
     this._rendered = false;
     this._lastSignature = "";
     this._refs = null;
+    this._showPreviewPlaceholder = false;
     this._onClick = (event) => this._handleClick(event);
   }
 
@@ -61,7 +107,9 @@ export class BatteryBarCard extends HTMLElement {
     this._refs.shell.addEventListener("click", this._onClick);
     if (this._config) {
       this._applyTheme();
-      this._renderModel();
+      if (!this._showPreviewPlaceholder) {
+        this._renderModel();
+      }
     }
   }
 
@@ -72,20 +120,36 @@ export class BatteryBarCard extends HTMLElement {
   }
 
   setConfig(config) {
-    const cleanup = runConfigCleanup(config, CONFIG_CLEANUP_STEPS);
+    const cleanup = runConfigCleanup(config, BATTERY_CONFIG_CLEANUP_STEPS);
+    const incomingType = cleanup.config?.type || config?.type || CARD_TYPE;
+    if (incomingType !== CARD_TYPE) {
+      throw new Error(`Card type must be '${CARD_TYPE}'.`);
+    }
     const normalized = normalizeConfig(cleanup.config);
-    validateConfig(normalized);
+    const hasRequiredEntities = hasRequiredEntityValues(
+      normalized.entities,
+      resolveRequiredBatteryKeys(normalized.battery_count),
+    );
+    if (hasRequiredEntities) {
+      validateConfig(normalized);
+    }
     this._config = normalized;
     this._lastSignature = "";
 
     this._ensureRendered();
+    this._syncPreviewPlaceholder(!hasRequiredEntities);
     this._applyTheme();
-    this._renderModel();
+    if (!this._showPreviewPlaceholder) {
+      this._renderModel();
+    }
   }
 
   set hass(hass) {
     this._hass = hass;
     if (!this._config) {
+      return;
+    }
+    if (this._showPreviewPlaceholder) {
       return;
     }
 
@@ -118,35 +182,38 @@ export class BatteryBarCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <ha-card>
         <div class="shell">
-          <section class="section section--summary" aria-label="Battery summary">
-            <div class="primary-row">
-              ${buildMetricButton("summary-primary", true)}
-            </div>
-            <div class="chip-row chip-row--summary">
-              ${buildMetricButton("summary-energy", false)}
-              ${buildMetricButton("summary-device-temperature", false)}
-            </div>
-          </section>
+          ${buildCardPreviewMarkup(CARD_DESCRIPTION)}
+          <div class="card-content">
+            <section class="section section--summary" aria-label="Battery summary">
+              <div class="primary-row">
+                ${buildMetricButtonMarkup("summary-primary", true)}
+              </div>
+              <div class="chip-row chip-row--summary">
+                ${buildMetricButtonMarkup("summary-energy", false)}
+                ${buildMetricButtonMarkup("summary-device-temperature", false)}
+              </div>
+            </section>
 
-          <section class="section section--battery" aria-label="Battery 1">
-            <div class="primary-row">
-              ${buildMetricButton("battery1-primary", true)}
-            </div>
-            <div class="chip-row chip-row--battery">
-              ${buildMetricButton("battery1-voltage", false)}
-              ${buildMetricButton("battery1-temp", false)}
-            </div>
-          </section>
+            <section class="section section--battery" aria-label="Battery 1">
+              <div class="primary-row">
+                ${buildMetricButtonMarkup("battery1-primary", true)}
+              </div>
+              <div class="chip-row chip-row--battery">
+                ${buildMetricButtonMarkup("battery1-voltage", false)}
+                ${buildMetricButtonMarkup("battery1-temp", false)}
+              </div>
+            </section>
 
-          <section class="section section--battery" aria-label="Battery 2">
-            <div class="primary-row">
-              ${buildMetricButton("battery2-primary", true)}
-            </div>
-            <div class="chip-row chip-row--battery">
-              ${buildMetricButton("battery2-voltage", false)}
-              ${buildMetricButton("battery2-temp", false)}
-            </div>
-          </section>
+            <section class="section section--battery" aria-label="Battery 2">
+              <div class="primary-row">
+                ${buildMetricButtonMarkup("battery2-primary", true)}
+              </div>
+              <div class="chip-row chip-row--battery">
+                ${buildMetricButtonMarkup("battery2-voltage", false)}
+                ${buildMetricButtonMarkup("battery2-temp", false)}
+              </div>
+            </section>
+          </div>
         </div>
       </ha-card>
       ${styles()}
@@ -154,6 +221,8 @@ export class BatteryBarCard extends HTMLElement {
 
     this._refs = {
       shell: this.shadowRoot.querySelector(".shell"),
+      previewPlaceholder: this.shadowRoot.querySelector(".card-preview-placeholder"),
+      content: this.shadowRoot.querySelector(".card-content"),
       battery1Section: this.shadowRoot.querySelector('[aria-label="Battery 1"]'),
       battery2Section: this.shadowRoot.querySelector('[aria-label="Battery 2"]'),
       summaryPrimary: this.shadowRoot.querySelector('[data-ref="summary-primary"]'),
@@ -166,6 +235,15 @@ export class BatteryBarCard extends HTMLElement {
       battery2Temp: this.shadowRoot.querySelector('[data-ref="battery2-temp"]'),
       battery2Voltage: this.shadowRoot.querySelector('[data-ref="battery2-voltage"]'),
     };
+  }
+
+  _syncPreviewPlaceholder(showPlaceholder) {
+    this._showPreviewPlaceholder = showPlaceholder === true;
+    syncCardPreviewVisibility(
+      this._refs?.previewPlaceholder,
+      [this._refs?.content],
+      this._showPreviewPlaceholder,
+    );
   }
 
   _renderModel() {
@@ -181,16 +259,16 @@ export class BatteryBarCard extends HTMLElement {
       this._refs.battery2Section.style.display = singleBattery ? "none" : "";
     }
 
-    applyMetric(this._hass, this._refs.summaryPrimary, model.summary.primary, { settleOnChange: true });
-    applyMetric(this._hass, this._refs.summaryEnergy, model.summary.chips[0]);
-    applyMetric(this._hass, this._refs.summaryDeviceTemperature, model.summary.chips[1]);
-    applyMetric(this._hass, this._refs.battery1Primary, model.battery1.primary, { settleOnChange: true });
-    applyMetric(this._hass, this._refs.battery1Voltage, model.battery1.chips[0]);
-    applyMetric(this._hass, this._refs.battery1Temp, model.battery1.chips[1]);
+    applyMetricButtonState(this._hass, this._refs.summaryPrimary, model.summary.primary, buildMetricOptions(true));
+    applyMetricButtonState(this._hass, this._refs.summaryEnergy, model.summary.chips[0], buildMetricOptions());
+    applyMetricButtonState(this._hass, this._refs.summaryDeviceTemperature, model.summary.chips[1], buildMetricOptions());
+    applyMetricButtonState(this._hass, this._refs.battery1Primary, model.battery1.primary, buildMetricOptions(true));
+    applyMetricButtonState(this._hass, this._refs.battery1Voltage, model.battery1.chips[0], buildMetricOptions());
+    applyMetricButtonState(this._hass, this._refs.battery1Temp, model.battery1.chips[1], buildMetricOptions());
     if (model.battery2) {
-      applyMetric(this._hass, this._refs.battery2Primary, model.battery2.primary, { settleOnChange: true });
-      applyMetric(this._hass, this._refs.battery2Voltage, model.battery2.chips[0]);
-      applyMetric(this._hass, this._refs.battery2Temp, model.battery2.chips[1]);
+      applyMetricButtonState(this._hass, this._refs.battery2Primary, model.battery2.primary, buildMetricOptions(true));
+      applyMetricButtonState(this._hass, this._refs.battery2Voltage, model.battery2.chips[0], buildMetricOptions());
+      applyMetricButtonState(this._hass, this._refs.battery2Temp, model.battery2.chips[1], buildMetricOptions());
     }
   }
 
@@ -237,10 +315,7 @@ class BatteryBarEditor extends HTMLElement {
     this._rawConfig = null;
     this._hass = null;
     this._form = null;
-    this._cleanupState = {
-      pendingKey: "",
-      lastAppliedKey: "",
-    };
+    this._cleanupState = createEditorCleanupState();
     this._onFormValueChanged = (event) => this._handleFormValueChangedEvent(event);
   }
 
@@ -259,14 +334,14 @@ class BatteryBarEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    const incoming = config && typeof config === "object" ? config : {};
-    const cleanup = runConfigCleanup(incoming, EDITOR_CLEANUP_STEPS);
-    this._rawConfig = {
-      ...cleanup.config,
-      type: cleanup.config.type || incoming.type || CARD_TYPE,
-    };
-    this._rawConfig.color_preset = normalizeColorPresetName(this._rawConfig.color_preset);
-    this._config = normalizeConfig(this._rawConfig);
+    const cleanup = applyEditorIncomingConfig(
+      this,
+      config,
+      BATTERY_EDITOR_CLEANUP_STEPS,
+      CARD_TYPE,
+      normalizeColorPresetName,
+      normalizeConfig,
+    );
     this._render();
     if (cleanup.changed) {
       queueConfigCleanup(this, this._rawConfig, this._cleanupState);
@@ -274,29 +349,16 @@ class BatteryBarEditor extends HTMLElement {
   }
 
   _render() {
-    if (!this.shadowRoot) {
-      return;
-    }
-
-    if (!this._form) {
-      this.shadowRoot.innerHTML = `
-        <div class="editor-shell">
-          <ha-form class="editor-form"></ha-form>
-        </div>
-        ${editorStyles()}
-      `;
-      this._form = this.shadowRoot.querySelector(".editor-form");
-      this._form?.addEventListener("value-changed", this._onFormValueChanged);
-    }
-
+    this._form = ensureSingleFormEditor(this, this._onFormValueChanged);
     if (!this._form) {
       return;
     }
-    const config = this._config || normalizeConfig(BatteryBarCard.getStubConfig());
-    this._form.hass = this._hass;
-    this._form.schema = buildEditorFormSchema(config, this._rawConfig);
-    this._form.data = buildBatteryEditorFormData(config, this._rawConfig);
-    this._form.computeLabel = (schema) => schema.label || schema.name || "";
+    renderSingleFormEditor(
+      this,
+      () => normalizeConfig(BatteryBarCard.getStubConfig()),
+      buildEditorFormSchema,
+      buildBatteryEditorFormData,
+    );
   }
 
   _handleFormValueChangedEvent(event) {
@@ -319,8 +381,8 @@ class BatteryBarEditor extends HTMLElement {
     if (useOverrides) {
       nextRaw.colors = {
         ...resolveEditorBackgroundColor(value.colors, this._rawConfig?.colors),
-        ...pickBatteryColorOverrides(this._config?.colors),
-        ...(hadOverrides ? pickBatteryEditorColorOverrides(value.colors) : {}),
+        ...pickMappedStringValues(this._config?.colors, BATTERY_COLOR_FIELD_MAP),
+        ...(hadOverrides ? pickMappedStringValues(value.colors, BATTERY_COLOR_FIELD_MAP) : {}),
       };
       nextRaw.track_blend = normalizeTrackBlendOverrideValue(
         value.track_blend,
@@ -336,101 +398,11 @@ class BatteryBarEditor extends HTMLElement {
       }
     }
 
-    this._rawConfig = nextRaw;
-    this._config = normalizeConfig(this._rawConfig);
-
+    commitEditorRawConfig(this, nextRaw, normalizeConfig);
     this._render();
     emitConfigChanged(this, this._rawConfig);
   }
 
-}
-
-function applyMetric(hass, button, metric, options = {}) {
-  if (!button) {
-    return;
-  }
-
-  const nextValue = metric?.value || "—";
-  const previousValue = button.dataset.metricValue || "";
-  const valueEl = button.querySelector(".metric-text");
-  if (valueEl) {
-    valueEl.textContent = nextValue;
-  }
-
-  button.dataset.metricValue = nextValue;
-  button.dataset.entityId = metric?.entityId || "";
-  button.disabled = !metric?.available;
-  button.title = metric?.title || "";
-  button.setAttribute("aria-label", metric?.title || "Battery metric");
-
-  const iconEl = button.querySelector(".metric-icon");
-  if (iconEl) {
-    syncEntityIcon(iconEl, hass, metric?.stateObj || null);
-  }
-
-  if (options.settleOnChange && shouldAnimatePrimarySettle(previousValue, nextValue)) {
-    animatePrimarySettle(button);
-  }
-}
-
-function buildMetricButton(ref, primary) {
-  const buttonClass = primary ? "metric-button metric-button--primary" : "metric-button metric-button--chip";
-  const iconClass = primary ? "metric-icon metric-icon--primary" : "metric-icon metric-icon--chip";
-  return `
-    <button class="${buttonClass}" data-ref="${ref}" type="button">
-      <ha-state-icon class="${iconClass}" hidden></ha-state-icon>
-      <span class="metric-text">—</span>
-    </button>
-  `;
-}
-
-function syncEntityIcon(iconEl, hass, stateObj) {
-  if (!iconEl) {
-    return;
-  }
-
-  if (stateObj) {
-    iconEl.hass = hass || null;
-    iconEl.stateObj = stateObj;
-    iconEl.state = stateObj;
-    iconEl.hidden = false;
-    return;
-  }
-
-  iconEl.hass = hass || null;
-  iconEl.stateObj = null;
-  iconEl.state = null;
-  iconEl.hidden = true;
-}
-
-function shouldAnimatePrimarySettle(previousValue, nextValue) {
-  return Boolean(previousValue)
-    && previousValue !== nextValue
-    && previousValue !== "—"
-    && nextValue !== "—";
-}
-
-function animatePrimarySettle(button) {
-  if (!button?.animate) {
-    return;
-  }
-  button.getAnimations().forEach((animation) => {
-    if (animation.id === "primary-settle") {
-      animation.cancel();
-    }
-  });
-  const animation = button.animate(
-    [
-      { transform: "translateY(1.5px)", opacity: 0.84 },
-      { transform: "translateY(0)", opacity: 1 },
-    ],
-    {
-      duration: PRIMARY_SETTLE_DURATION_MS,
-      easing: COLOR_EASING,
-      fill: "none",
-    },
-  );
-  animation.id = "primary-settle";
 }
 
 function styles() {
@@ -466,15 +438,28 @@ function styles() {
 
       .shell {
         width: 100%;
-        height: var(--bb-bar-height);
+        display: block;
+      }
+
+      ${buildCardPreviewStyles("--bb-bar-height")}
+
+      .card-content {
+        width: 100%;
+        height: 100%;
         display: grid;
         grid-template-columns: var(--bb-columns);
         align-items: stretch;
+        grid-column: 1 / -1;
+        height: var(--bb-bar-height);
         background: var(--bb-track-bg);
         color: var(--bb-text);
         transition: background-color ${COLOR_TRANSITION}, color ${COLOR_TRANSITION};
         border-radius: var(--bb-radius);
         overflow: hidden;
+      }
+
+      .card-content[hidden] {
+        display: none !important;
       }
 
       .section {
@@ -630,19 +615,6 @@ function styles() {
   `;
 }
 
-function registerCustomCardMetadata(type, name, description) {
-  window.customCards = window.customCards || [];
-  if (window.customCards.some((item) => item.type === type)) {
-    return;
-  }
-  window.customCards.push({
-    type,
-    name,
-    description,
-    preview: true,
-  });
-}
-
 export function registerCard() {
   if (!customElements.get(CARD_ELEMENT_TAG)) {
     customElements.define(CARD_ELEMENT_TAG, BatteryBarCard);
@@ -651,8 +623,23 @@ export function registerCard() {
   registerCustomCardMetadata(
     CARD_ELEMENT_TAG,
     CARD_NAME,
-    "Battery Bar: compact summary and dual battery status card for Home Assistant.",
+    CARD_DESCRIPTION,
   );
+}
+
+function buildMetricOptions(settleOnChange = false) {
+  return {
+    defaultAriaLabel: "Battery metric",
+    settleOnChange,
+    settleDurationMs: PRIMARY_SETTLE_DURATION_MS,
+    settleEasing: COLOR_EASING,
+  };
+}
+
+function resolveRequiredBatteryKeys(batteryCount) {
+  return Number(batteryCount) === 2
+    ? [...REQUIRED_ENTITY_KEYS, ...BATTERY2_ENTITY_KEYS]
+    : REQUIRED_ENTITY_KEYS;
 }
 
 function resolveTrackBackground(config, hass) {
@@ -694,22 +681,18 @@ function readNumericState(hass, entityId) {
 }
 
 function buildTopFormSchema() {
-  const colorSelector = { text: {} };
-
   return [
     {
       type: "expandable",
       title: "Layout & Motion",
       schema: [
-        { name: "battery_count", label: "Number of battery segments", required: true, selector: { number: { min: 1, max: 2, step: 1, mode: "box" } } },
-        { name: "bar_height", label: "Bar height (px)", required: true, selector: { number: { min: 24, max: 72, step: 1, mode: "slider" } } },
-        { name: "corner_radius", label: "Corner radius (px)", required: true, selector: { number: { min: 0, max: 30, step: 1, mode: "slider" } } },
+        { name: "battery_count", label: "Number of battery segments", required: true, selector: buildBoxNumberSelector({ min: 1, max: 2, step: 1 }) },
+        { name: "bar_height", label: "Bar height (px)", required: true, selector: buildSliderNumberSelector(EDITOR_SCHEMA_RANGE_BAR_HEIGHT) },
+        { name: "corner_radius", label: "Corner radius (px)", required: true, selector: buildSliderNumberSelector(EDITOR_SCHEMA_RANGE_CORNER_RADIUS) },
         {
           type: "grid",
           name: "colors",
-          schema: [
-            { name: "background", label: "Card background color", required: false, selector: colorSelector },
-          ],
+          schema: [buildBackgroundColorField()],
         },
         { name: "background_transparent", label: "Use transparent card background", selector: { boolean: {} } },
       ],
@@ -749,16 +732,14 @@ function buildBottomFormSchema(config) {
 }
 
 function buildColorOverridesGridSchema() {
-  const colorSelector = { text: {} };
-
   return [
-    { name: "track", label: "Base track color", required: false, selector: colorSelector },
-    { name: "text_light", label: "Light text and icon color", required: false, selector: colorSelector },
-    { name: "text_dark", label: "Dark text and icon color", required: false, selector: colorSelector },
-    { name: "divider", label: "Divider line color", required: false, selector: colorSelector },
-    { name: "energy_storage_in", label: "Battery charge color", required: false, selector: colorSelector },
-    { name: "energy_storage_out", label: "Battery discharge color", required: false, selector: colorSelector },
-    { name: "home_load", label: "Idle state color", required: false, selector: colorSelector },
+    { name: "track", label: "Base track color", required: false, selector: buildColorTextSelector() },
+    { name: "text_light", label: "Light text and icon color", required: false, selector: buildColorTextSelector() },
+    { name: "text_dark", label: "Dark text and icon color", required: false, selector: buildColorTextSelector() },
+    { name: "divider", label: "Divider line color", required: false, selector: buildColorTextSelector() },
+    { name: "energy_storage_in", label: "Battery charge color", required: false, selector: buildColorTextSelector() },
+    { name: "energy_storage_out", label: "Battery discharge color", required: false, selector: buildColorTextSelector() },
+    { name: "home_load", label: "Idle state color", required: false, selector: buildColorTextSelector() },
   ];
 }
 
@@ -788,7 +769,7 @@ function buildColorSectionSchema(showOverrides) {
       name: "track_blend",
       label: "Track blend",
       required: false,
-      selector: { number: { min: 0.1, max: 0.4, step: 0.01, mode: "slider" } },
+      selector: buildSliderNumberSelector(EDITOR_SCHEMA_RANGE_TRACK_BLEND),
     });
     schema.push({
       type: "grid",
@@ -817,171 +798,6 @@ function buildEditorFormSchema(config, rawConfig) {
 function buildBatteryEditorFormData(config, rawConfig) {
   return {
     ...config,
-    use_color_overrides: hasColorOverrides(rawConfig),
-    track_blend: resolveEditorTrackBlend(rawConfig, config.track_blend),
-    colors: {
-      ...pickBackgroundColor(rawConfig?.colors),
-      ...pickBatteryEditorColorOverrides(rawConfig?.colors),
-    },
-  };
-}
-
-function buildTopFormData(config) {
-  return {
-    battery_count: config.battery_count,
-    bar_height: config.bar_height,
-    corner_radius: config.corner_radius,
-    background_transparent: config.background_transparent,
-    colors: pickBackgroundColor(config?.colors),
-  };
-}
-
-function hasColorOverrides(config) {
-  const colors = config?.colors;
-  const hasTokenOverrides = Boolean(colors)
-    && typeof colors === "object"
-    && Object.entries(colors).some(
-      ([key, value]) => key !== "background" && typeof value === "string" && value.trim().length > 0,
-    );
-  const trackBlend = Number(config?.track_blend);
-  return hasTokenOverrides || Number.isFinite(trackBlend);
-}
-
-function editorStyles() {
-  return `
-    <style>
-      .editor-shell {
-        display: grid;
-        gap: 12px;
-      }
-    </style>
-  `;
-}
-
-function syncEditorFormsHass(forms, hass) {
-  for (const form of forms) {
-    if (form) {
-      form.hass = hass;
-    }
-  }
-}
-
-function pickBatteryColorOverrides(colors) {
-  const source = colors && typeof colors === "object" ? colors : {};
-  return {
-    track: source.track || "",
-    text_light: source.text_light || source.text || "",
-    text_dark: source.text_dark || source.text || "",
-    divider: source.divider || "",
-    energy_storage_in: source.energy_storage_in || "",
-    energy_storage_out: source.energy_storage_out || "",
-    home_load: source.home_load || "",
-  };
-}
-
-function pickBatteryEditorColorOverrides(colors) {
-  const source = colors && typeof colors === "object" ? colors : {};
-  return {
-    track: source.track || "",
-    text_light: source.text_light || source.text || "",
-    text_dark: source.text_dark || source.text || "",
-    divider: source.divider || "",
-    energy_storage_in: source.energy_storage_in || "",
-    energy_storage_out: source.energy_storage_out || "",
-    home_load: source.home_load || "",
-  };
-}
-
-function pickBackgroundColor(colors) {
-  if (!colors || typeof colors !== "object" || typeof colors.background !== "string" || colors.background.trim().length === 0) {
-    return {};
-  }
-  const background = colors.background.trim();
-  if (background.toUpperCase() === DEFAULT_CONFIG.colors.background) {
-    return {};
-  }
-  return { background };
-}
-
-function resolveEditorBackgroundColor(formColors, fallbackColors) {
-  if (formColors && typeof formColors === "object" && Object.prototype.hasOwnProperty.call(formColors, "background")) {
-    return pickBackgroundColor(formColors);
-  }
-  return pickBackgroundColor(fallbackColors);
-}
-
-function resolveEditorTrackBlend(rawConfig, fallback) {
-  const trackBlend = Number(rawConfig?.track_blend);
-  if (!Number.isFinite(trackBlend)) {
-    return fallback;
-  }
-  return Math.min(0.4, Math.max(0.1, trackBlend));
-}
-
-function normalizeTrackBlendOverrideValue(value, fallback) {
-  const trackBlend = Number(value);
-  if (!Number.isFinite(trackBlend)) {
-    return fallback;
-  }
-  return Math.min(0.4, Math.max(0.1, trackBlend));
-}
-
-function migrateLegacyBatteryColors(config) {
-  if (!config || typeof config !== "object" || !config.colors || typeof config.colors !== "object") {
-    return config;
-  }
-
-  const colors = config.colors;
-  const nextColors = {
-    ...colors,
-  };
-
-  let changed = false;
-
-  if (!nextColors.energy_storage_in && typeof colors.battery_charge === "string") {
-    nextColors.energy_storage_in = colors.battery_charge;
-    changed = true;
-  }
-  if (!nextColors.energy_storage_out && typeof colors.battery_discharge === "string") {
-    nextColors.energy_storage_out = colors.battery_discharge;
-    changed = true;
-  }
-  if (!nextColors.home_load && typeof colors.battery_idle === "string") {
-    nextColors.home_load = colors.battery_idle;
-    changed = true;
-  }
-  if (!nextColors.text_light && typeof colors.text === "string") {
-    nextColors.text_light = colors.text;
-    changed = true;
-  }
-  if (!nextColors.text_dark && typeof colors.text === "string") {
-    nextColors.text_dark = colors.text;
-    changed = true;
-  }
-
-  if ("battery_charge" in nextColors) {
-    delete nextColors.battery_charge;
-    changed = true;
-  }
-  if ("battery_discharge" in nextColors) {
-    delete nextColors.battery_discharge;
-    changed = true;
-  }
-  if ("battery_idle" in nextColors) {
-    delete nextColors.battery_idle;
-    changed = true;
-  }
-  if ("text" in nextColors) {
-    delete nextColors.text;
-    changed = true;
-  }
-
-  if (!changed) {
-    return config;
-  }
-
-  return {
-    ...config,
-    colors: nextColors,
+    ...buildColorOverrideEditorState(config, rawConfig, BATTERY_COLOR_FIELD_MAP, DEFAULT_CONFIG.colors.background),
   };
 }

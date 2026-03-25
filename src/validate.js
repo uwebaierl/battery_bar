@@ -10,60 +10,59 @@ import {
   mergeColorPresetTokens,
   resolveColorPresetTrackBlend,
 } from "./_shared/color-presets.js";
+import {
+  normalizeEntity,
+  normalizeMappedStringValues,
+  normalizeObjectInput,
+  normalizeOptionalEntity,
+  normalizeString,
+  validateCardType,
+  validateColorPresetValue,
+  validateConfigObject,
+  validateIntegerRange,
+  validateOptionalEntityMap,
+  validateRange,
+  validateRequiredColorMap,
+  validateRequiredEntityMap,
+} from "./_shared/validation.js";
+
+const BATTERY_COLOR_OVERRIDE_MAP = {
+  track: ["track"],
+  text_light: ["text_light", "text"],
+  text_dark: ["text_dark", "text"],
+  divider: ["divider"],
+  energy_storage_in: ["energy_storage_in", "battery_charge"],
+  energy_storage_out: ["energy_storage_out", "battery_discharge"],
+  home_load: ["home_load", "battery_idle"],
+};
 
 export function validateConfig(config) {
-  if (!config || typeof config !== "object") {
-    throw new Error("Invalid configuration.");
-  }
-
-  if (config.type !== CARD_TYPE) {
-    throw new Error(`Card type must be '${CARD_TYPE}'.`);
-  }
+  validateConfigObject(config);
+  validateCardType(config, CARD_TYPE);
 
   validateIntegerRange(config.battery_count, "battery_count", 1, 2);
   validateRange(config.bar_height, "bar_height", 24, 72);
   validateRange(config.corner_radius, "corner_radius", 0, 30);
   validateRange(config.track_blend, "track_blend", 0.1, 0.4);
-  validateColorPreset(config.color_preset);
+  validateColorPresetValue(config.color_preset, isKnownColorPreset);
 
   if (typeof config.background_transparent !== "boolean") {
     throw new Error("background_transparent must be true or false.");
   }
 
-  if (!config.entities || typeof config.entities !== "object") {
-    throw new Error("entities must be an object.");
-  }
-  for (const key of REQUIRED_ENTITY_KEYS) {
-    const value = config.entities[key];
-    if (typeof value !== "string" || value.trim().length === 0) {
-      throw new Error(`entities.${key} must be a non-empty entity id string.`);
-    }
-  }
+  validateRequiredEntityMap(config.entities, REQUIRED_ENTITY_KEYS);
   if (config.battery_count === 2) {
     for (const key of BATTERY2_ENTITY_KEYS) {
-      const value = config.entities[key];
+      const value = config.entities?.[key];
       if (typeof value !== "string" || value.trim().length === 0) {
         throw new Error(`entities.${key} must be a non-empty entity id string when battery_count is 2.`);
       }
     }
   } else {
-    for (const key of BATTERY2_ENTITY_KEYS) {
-      const value = config.entities[key];
-      if (value !== undefined && value !== null && typeof value !== "string") {
-        throw new Error(`entities.${key} must be an entity id string when set.`);
-      }
-    }
+    validateOptionalEntityMap(config.entities, BATTERY2_ENTITY_KEYS);
   }
 
-  if (!config.colors || typeof config.colors !== "object") {
-    throw new Error("colors must be an object.");
-  }
-  for (const key of COLOR_KEYS) {
-    const value = config.colors[key];
-    if (typeof value !== "string" || value.trim().length === 0) {
-      throw new Error(`colors.${key} must be a non-empty color string.`);
-    }
-  }
+  validateRequiredColorMap(config.colors, COLOR_KEYS);
 }
 
 export function normalizeConfig(config) {
@@ -71,8 +70,8 @@ export function normalizeConfig(config) {
   const batteryCount = source.battery_count === undefined
     ? DEFAULT_CONFIG.battery_count
     : Number(source.battery_count);
-  const entitiesInput = source.entities && typeof source.entities === "object" ? source.entities : {};
-  const colorsInput = source.colors && typeof source.colors === "object" ? source.colors : {};
+  const entitiesInput = normalizeObjectInput(source.entities);
+  const colorsInput = normalizeObjectInput(source.colors);
 
   return {
     type: CARD_TYPE,
@@ -106,78 +105,12 @@ export function normalizeConfig(config) {
         : normalizeOptionalEntity(entitiesInput.battery2_voltage),
     },
     colors: {
-      background: normalizeColor(colorsInput.background, DEFAULT_CONFIG.colors.background),
+      background: normalizeString(colorsInput.background, DEFAULT_CONFIG.colors.background),
       ...mergeColorPresetTokens(
         source.color_preset,
         {},
-        normalizeColorOverrides(colorsInput),
+        normalizeMappedStringValues(colorsInput, BATTERY_COLOR_OVERRIDE_MAP, null),
       ),
     },
-  };
-}
-
-function validateRange(value, key, min, max) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < min || n > max) {
-    throw new Error(`${key} must be a number between ${min} and ${max}.`);
-  }
-}
-
-function validateIntegerRange(value, key, min, max) {
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < min || n > max) {
-    throw new Error(`${key} must be an integer between ${min} and ${max}.`);
-  }
-}
-
-function validateColorPreset(value) {
-  if (value === undefined) {
-    return;
-  }
-  if (typeof value !== "string" || !isKnownColorPreset(value)) {
-    throw new Error("color_preset must be a supported preset name.");
-  }
-}
-
-function normalizeColor(value, fallback) {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    return fallback;
-  }
-  return value.trim();
-}
-
-function normalizeEntity(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-  return value.trim();
-}
-
-function normalizeOptionalEntity(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-  return value.trim();
-}
-
-function normalizeColorOverrides(colorsInput) {
-  return {
-    background: normalizeColor(colorsInput.background, null),
-    track: normalizeColor(colorsInput.track, null),
-    text_light: normalizeColor(colorsInput.text_light ?? colorsInput.text, null),
-    text_dark: normalizeColor(colorsInput.text_dark ?? colorsInput.text, null),
-    divider: normalizeColor(colorsInput.divider, null),
-    energy_storage_in: normalizeColor(
-      colorsInput.energy_storage_in ?? colorsInput.battery_charge,
-      null,
-    ),
-    energy_storage_out: normalizeColor(
-      colorsInput.energy_storage_out ?? colorsInput.battery_discharge,
-      null,
-    ),
-    home_load: normalizeColor(
-      colorsInput.home_load ?? colorsInput.battery_idle,
-      null,
-    ),
   };
 }

@@ -7,6 +7,11 @@ The format is based on Keep a Changelog and this project uses Semantic Versionin
 ## [Unreleased]
 
 ### Changed
+- Removed the forced full-width preview placeholder wrapper so the chooser/editor description centers correctly.
+- Shortened the chooser/editor preview description so Battery Bar aligns more evenly with the other card previews.
+- Fixed the incomplete-config preview so Battery Bar now shows only the centered description text instead of text plus an empty bar shell.
+- Fixed the chooser/editor preview refactor so the normal Battery Bar layout keeps its full-width section grid instead of collapsing into a broken wrapped column.
+- Aligned the incomplete-config chooser/editor preview with the other cards and moved repeated editor color-state and selector-range helpers into shared workspace modules.
 - Removed prefilled example entity ids, removed hardcoded metric fallback labels/titles, and made preset colors the only semantic color baseline outside explicit manual overrides.
 - Removed the remaining legacy decimal cleanup and raw-state formatting fallback so displayed values now rely only on Home Assistant's entity formatting.
 - Removed hardcoded battery metric icon fallbacks so visible icons now always come from the configured Home Assistant entities.

@@ -1,4 +1,18 @@
-import { buildCardModel, collectRelevantEntities, computeEntitySignature } from "./battery-model.js";
+import { buildCardModel, collectRelevantEntities } from "./battery-model.js";
+import {
+  getColorPresetOptions,
+  normalizeColorPresetName,
+} from "./_shared/color-presets.js";
+import {
+  emitConfigChanged,
+  flushConfigCleanup,
+  queueConfigCleanup,
+  runConfigCleanup,
+  createRemovePathsCleanup,
+} from "./_shared/config-cleanup.js";
+import { blendHex, pickBestTextColor } from "./_shared/color.js";
+import { openMoreInfo } from "./_shared/interaction.js";
+import { computeEntitySignature } from "./_shared/signature.js";
 import {
   CARD_ELEMENT_TAG,
   CARD_NAME,
@@ -12,6 +26,13 @@ const COLOR_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const COLOR_TRANSITION = `260ms ${COLOR_EASING}`;
 const PRIMARY_SETTLE_DURATION_MS = 220;
 const EDITOR_ELEMENT_TAG = "battery-bar-editor";
+const CONFIG_CLEANUP_STEPS = [
+  migrateLegacyBatteryColors,
+];
+const EDITOR_CLEANUP_STEPS = [
+  createRemovePathsCleanup(["decimals"]),
+  migrateLegacyBatteryColors,
+];
 
 export class BatteryBarCard extends HTMLElement {
   constructor() {
@@ -53,7 +74,8 @@ export class BatteryBarCard extends HTMLElement {
   }
 
   setConfig(config) {
-    const normalized = normalizeConfig(config);
+    const cleanup = runConfigCleanup(config, CONFIG_CLEANUP_STEPS);
+    const normalized = normalizeConfig(cleanup.config);
     validateConfig(normalized);
     this._config = normalized;
     this._lastSignature = "";
@@ -177,12 +199,14 @@ export class BatteryBarCard extends HTMLElement {
   _applyTheme() {
     const config = this._config || DEFAULT_CONFIG;
     const colors = config.colors || DEFAULT_CONFIG.colors;
+    const trackBackground = resolveTrackBackground(config, this._hass);
+    const textColor = pickBestTextColor(trackBackground, colors.text_light, colors.text_dark);
 
     this.style.setProperty("--bb-bar-height", `${config.bar_height}px`);
     this.style.setProperty("--bb-radius", `${config.corner_radius}px`);
     this.style.setProperty("--bb-card-bg", config.background_transparent ? "transparent" : colors.background);
-    this.style.setProperty("--bb-track-bg", resolveTrackBackground(config, this._hass));
-    this.style.setProperty("--bb-text", colors.text);
+    this.style.setProperty("--bb-track-bg", trackBackground);
+    this.style.setProperty("--bb-text", textColor);
     this.style.setProperty("--bb-line-gap", `${FIXED_LINE_GAP_PX}px`);
     this.style.setProperty("--bb-primary-font-summary", "17px");
     this.style.setProperty("--bb-primary-font-battery", "17px");
@@ -203,17 +227,7 @@ export class BatteryBarCard extends HTMLElement {
 
     event.preventDefault();
     event.stopPropagation();
-    if (typeof this._hass?.moreInfo === "function") {
-      this._hass.moreInfo(entityId);
-      return;
-    }
-
-    const moreInfo = new Event("hass-more-info", {
-      bubbles: true,
-      composed: true,
-    });
-    moreInfo.detail = { entityId };
-    this.dispatchEvent(moreInfo);
+    openMoreInfo(this, this._hass, entityId);
   }
 }
 
@@ -222,35 +236,43 @@ class BatteryBarEditor extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._config = null;
+    this._rawConfig = null;
     this._hass = null;
     this._form = null;
-    this._onValueChanged = (event) => this._handleValueChangedEvent(event);
+    this._cleanupState = {
+      pendingKey: "",
+      lastAppliedKey: "",
+    };
+    this._onFormValueChanged = (event) => this._handleFormValueChangedEvent(event);
   }
 
   set hass(hass) {
     this._hass = hass;
-    if (this._form) {
-      this._form.hass = hass;
-    }
+    syncEditorFormsHass([this._form], hass);
   }
 
   connectedCallback() {
     this._render();
+    flushConfigCleanup(this, this._cleanupState);
   }
 
   disconnectedCallback() {
-    if (this._form) {
-      this._form.removeEventListener("value-changed", this._onValueChanged);
-    }
+    this._form?.removeEventListener("value-changed", this._onFormValueChanged);
   }
 
   setConfig(config) {
     const incoming = config && typeof config === "object" ? config : {};
-    this._config = normalizeConfig({
-      ...incoming,
-      type: incoming.type || CARD_TYPE,
-    });
+    const cleanup = runConfigCleanup(incoming, EDITOR_CLEANUP_STEPS);
+    this._rawConfig = {
+      ...cleanup.config,
+      type: cleanup.config.type || incoming.type || CARD_TYPE,
+    };
+    this._rawConfig.color_preset = normalizeColorPresetName(this._rawConfig.color_preset);
+    this._config = normalizeConfig(this._rawConfig);
     this._render();
+    if (cleanup.changed) {
+      queueConfigCleanup(this, this._rawConfig, this._cleanupState);
+    }
   }
 
   _render() {
@@ -259,43 +281,70 @@ class BatteryBarEditor extends HTMLElement {
     }
 
     if (!this._form) {
-      this.shadowRoot.innerHTML = "<ha-form></ha-form>";
-      this._form = this.shadowRoot.querySelector("ha-form");
-      this._form?.addEventListener("value-changed", this._onValueChanged);
+      this.shadowRoot.innerHTML = `
+        <div class="editor-shell">
+          <ha-form class="editor-form"></ha-form>
+        </div>
+        ${editorStyles()}
+      `;
+      this._form = this.shadowRoot.querySelector(".editor-form");
+      this._form?.addEventListener("value-changed", this._onFormValueChanged);
     }
 
     if (!this._form) {
       return;
     }
+    const config = this._config || normalizeConfig(BatteryBarCard.getStubConfig());
     this._form.hass = this._hass;
-    this._form.schema = buildConfigFormSchema();
-    this._form.data = this._config || normalizeConfig(BatteryBarCard.getStubConfig());
+    this._form.schema = buildEditorFormSchema(config, this._rawConfig);
+    this._form.data = buildBatteryEditorFormData(config, this._rawConfig);
     this._form.computeLabel = (schema) => schema.label || schema.name || "";
   }
 
-  _handleValueChangedEvent(event) {
+  _handleFormValueChangedEvent(event) {
     event.stopPropagation();
     const value = event?.detail?.value;
     if (!value || typeof value !== "object") {
       return;
     }
 
-    this._config = normalizeConfig({
-      ...(this._config || {}),
+    const useOverrides = value.use_color_overrides === true;
+    const hadOverrides = hasColorOverrides(this._rawConfig);
+    const nextRaw = {
+      ...(this._rawConfig || {}),
       ...value,
       type: CARD_TYPE,
-    });
+      color_preset: normalizeColorPresetName(value.color_preset ?? this._rawConfig?.color_preset),
+    };
+    delete nextRaw.use_color_overrides;
 
-    if (this._form) {
-      this._form.data = this._config;
+    if (useOverrides) {
+      nextRaw.colors = {
+        ...resolveEditorBackgroundColor(value.colors, this._rawConfig?.colors),
+        ...pickBatteryColorOverrides(this._config?.colors || DEFAULT_CONFIG.colors),
+        ...(hadOverrides ? pickBatteryEditorColorOverrides(value.colors) : {}),
+      };
+      nextRaw.track_blend = normalizeTrackBlendOverrideValue(
+        value.track_blend,
+        this._config?.track_blend ?? DEFAULT_CONFIG.track_blend,
+      );
+    } else {
+      nextRaw.colors = {
+        ...resolveEditorBackgroundColor(value.colors, this._rawConfig?.colors),
+      };
+      delete nextRaw.track_blend;
+      if (Object.keys(nextRaw.colors).length === 0) {
+        delete nextRaw.colors;
+      }
     }
 
-    this.dispatchEvent(new CustomEvent("config-changed", {
-      detail: { config: this._config },
-      bubbles: true,
-      composed: true,
-    }));
+    this._rawConfig = nextRaw;
+    this._config = normalizeConfig(this._rawConfig);
+
+    this._render();
+    emitConfigChanged(this, this._rawConfig);
   }
+
 }
 
 function applyMetric(button, metric, options = {}) {
@@ -603,14 +652,14 @@ function resolveTrackBackground(config, hass) {
   const dischargeValue = readNumericState(hass, entities.battery_discharge);
 
   if (dischargeValue > chargeValue && dischargeValue > 0) {
-    return blendHex(colors.track, colors.battery_discharge, config?.track_blend);
+    return blendHex(colors.track, colors.energy_storage_out, config?.track_blend);
   }
 
   if (chargeValue > 0) {
-    return blendHex(colors.track, colors.battery_charge, config?.track_blend);
+    return blendHex(colors.track, colors.energy_storage_in, config?.track_blend);
   }
 
-  return blendHex(colors.track, colors.battery_idle, config?.track_blend);
+  return blendHex(colors.track, colors.home_load, config?.track_blend);
 }
 
 function readNumericState(hass, entityId) {
@@ -634,83 +683,42 @@ function readNumericState(hass, entityId) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function blendHex(baseHex, accentHex, blendAmount) {
-  const base = parseHex(baseHex);
-  const accent = parseHex(accentHex);
-  const blend = clamp(0, Number(blendAmount) || 0, 1);
-  const keep = 1 - blend;
-
-  return toHex({
-    r: Math.round((base.r * blend) + (accent.r * keep)),
-    g: Math.round((base.g * blend) + (accent.g * keep)),
-    b: Math.round((base.b * blend) + (accent.b * keep)),
-  });
-}
-
-function parseHex(hex) {
-  const cleaned = String(hex || "").trim();
-  const value = /^#[0-9A-Fa-f]{6}$/.test(cleaned) ? cleaned.slice(1) : "000000";
-
-  return {
-    r: parseInt(value.slice(0, 2), 16),
-    g: parseInt(value.slice(2, 4), 16),
-    b: parseInt(value.slice(4, 6), 16),
-  };
-}
-
-function toHex(rgb) {
-  const r = clamp(0, Math.round(rgb.r), 255).toString(16).padStart(2, "0");
-  const g = clamp(0, Math.round(rgb.g), 255).toString(16).padStart(2, "0");
-  const b = clamp(0, Math.round(rgb.b), 255).toString(16).padStart(2, "0");
-  return `#${r}${g}${b}`;
-}
-
-function clamp(min, value, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function buildConfigFormSchema() {
-  const entitySelector = { entity: { domain: ["sensor", "input_number"] } };
+function buildTopFormSchema() {
   const colorSelector = { text: {} };
-  const decimalSelector = { number: { min: 0, max: 2, step: 1, mode: "box" } };
 
   return [
     {
       type: "expandable",
-      title: "Layout & Styling",
+      title: "Layout & Motion",
       schema: [
         { name: "battery_count", label: "Number of battery segments", required: true, selector: { number: { min: 1, max: 2, step: 1, mode: "box" } } },
         { name: "bar_height", label: "Bar height (px)", required: true, selector: { number: { min: 24, max: 72, step: 1, mode: "slider" } } },
         { name: "corner_radius", label: "Corner radius (px)", required: true, selector: { number: { min: 0, max: 30, step: 1, mode: "slider" } } },
-        { name: "track_blend", label: "Track/state color blend (0.15-0.30)", required: true, selector: { number: { min: 0.15, max: 0.3, step: 0.01, mode: "slider" } } },
+        {
+          type: "grid",
+          name: "colors",
+          schema: [
+            { name: "background", label: "Card background color", required: false, selector: colorSelector },
+          ],
+        },
         { name: "background_transparent", label: "Use transparent card background", selector: { boolean: {} } },
       ],
     },
-    {
-      type: "expandable",
-      title: "Colors",
-      name: "colors",
-      schema: [
-        { name: "background", label: "Card background color", required: true, selector: colorSelector },
-        { name: "track", label: "Base track color", required: true, selector: colorSelector },
-        { name: "text", label: "Text and icon color", required: true, selector: colorSelector },
-        { name: "divider", label: "Divider line color", required: true, selector: colorSelector },
-        { name: "battery_charge", label: "Charge state color", required: true, selector: colorSelector },
-        { name: "battery_discharge", label: "Discharge state color", required: true, selector: colorSelector },
-        { name: "battery_idle", label: "Idle state color", required: true, selector: colorSelector },
-      ],
-    },
-    {
-      type: "expandable",
-      title: "Decimals",
-      name: "decimals",
-      schema: [
-        { name: "soc", label: "SoC value decimals", required: true, selector: decimalSelector },
-        { name: "energy", label: "Energy value decimals", required: true, selector: decimalSelector },
-        { name: "temperature", label: "Temperature value decimals", required: true, selector: decimalSelector },
-        { name: "voltage", label: "Voltage value decimals", required: true, selector: decimalSelector },
-      ],
-    },
+  ];
+}
+
+function buildBottomFormSchema(config) {
+  const entitySelector = { entity: { domain: ["sensor", "input_number"] } };
+  const batteryCount = Number(config?.battery_count) === 1 ? 1 : 2;
+  const battery2Fields = batteryCount === 2
+    ? [
+      { name: "battery2_soc", label: "Battery 2 top row SoC entity", required: true, selector: entitySelector },
+      { name: "battery2_voltage", label: "Battery 2 second row voltage entity", required: true, selector: entitySelector },
+      { name: "battery2_temp", label: "Battery 2 second row temperature entity", required: true, selector: entitySelector },
+    ]
+    : [];
+
+  return [
     {
       type: "expandable",
       title: "Entities",
@@ -724,10 +732,246 @@ function buildConfigFormSchema() {
         { name: "battery1_soc", label: "Battery 1 top row SoC entity", required: true, selector: entitySelector },
         { name: "battery1_voltage", label: "Battery 1 second row voltage entity", required: true, selector: entitySelector },
         { name: "battery1_temp", label: "Battery 1 second row temperature entity", required: true, selector: entitySelector },
-        { name: "battery2_soc", label: "Battery 2 top row SoC entity", required: true, selector: entitySelector },
-        { name: "battery2_voltage", label: "Battery 2 second row voltage entity", required: true, selector: entitySelector },
-        { name: "battery2_temp", label: "Battery 2 second row temperature entity", required: true, selector: entitySelector },
+        ...battery2Fields,
       ],
     },
   ];
+}
+
+function buildColorOverridesGridSchema() {
+  const colorSelector = { text: {} };
+
+  return [
+    { name: "track", label: "Base track color", required: false, selector: colorSelector },
+    { name: "text_light", label: "Light text and icon color", required: false, selector: colorSelector },
+    { name: "text_dark", label: "Dark text and icon color", required: false, selector: colorSelector },
+    { name: "divider", label: "Divider line color", required: false, selector: colorSelector },
+    { name: "energy_storage_in", label: "Battery charge color", required: false, selector: colorSelector },
+    { name: "energy_storage_out", label: "Battery discharge color", required: false, selector: colorSelector },
+    { name: "home_load", label: "Idle state color", required: false, selector: colorSelector },
+  ];
+}
+
+function buildColorSectionSchema(showOverrides) {
+  const schema = [
+    {
+      name: "color_preset",
+      label: "Color preset",
+      required: false,
+      selector: {
+        select: {
+          mode: "dropdown",
+          options: getColorPresetOptions(),
+        },
+      },
+    },
+    {
+      name: "use_color_overrides",
+      label: "Use custom color overrides",
+      required: false,
+      selector: { boolean: {} },
+    },
+  ];
+
+  if (showOverrides) {
+    schema.push({
+      name: "track_blend",
+      label: "Track blend",
+      required: false,
+      selector: { number: { min: 0.1, max: 0.4, step: 0.01, mode: "slider" } },
+    });
+    schema.push({
+      type: "grid",
+      name: "colors",
+      schema: buildColorOverridesGridSchema(),
+    });
+  }
+
+  return [
+    {
+      type: "expandable",
+      title: "Colors",
+      schema,
+    },
+  ];
+}
+
+function buildEditorFormSchema(config, rawConfig) {
+  return [
+    ...buildTopFormSchema(),
+    ...buildColorSectionSchema(hasColorOverrides(rawConfig)),
+    ...buildBottomFormSchema(config),
+  ];
+}
+
+function buildBatteryEditorFormData(config, rawConfig) {
+  return {
+    ...config,
+    use_color_overrides: hasColorOverrides(rawConfig),
+    track_blend: resolveEditorTrackBlend(rawConfig, config.track_blend),
+    colors: {
+      ...pickBackgroundColor(rawConfig?.colors),
+      ...pickBatteryEditorColorOverrides(rawConfig?.colors),
+    },
+  };
+}
+
+function buildTopFormData(config) {
+  return {
+    battery_count: config.battery_count,
+    bar_height: config.bar_height,
+    corner_radius: config.corner_radius,
+    background_transparent: config.background_transparent,
+    colors: pickBackgroundColor(config?.colors),
+  };
+}
+
+function hasColorOverrides(config) {
+  const colors = config?.colors;
+  const hasTokenOverrides = Boolean(colors)
+    && typeof colors === "object"
+    && Object.entries(colors).some(
+      ([key, value]) => key !== "background" && typeof value === "string" && value.trim().length > 0,
+    );
+  const trackBlend = Number(config?.track_blend);
+  return hasTokenOverrides || Number.isFinite(trackBlend);
+}
+
+function editorStyles() {
+  return `
+    <style>
+      .editor-shell {
+        display: grid;
+        gap: 12px;
+      }
+    </style>
+  `;
+}
+
+function syncEditorFormsHass(forms, hass) {
+  for (const form of forms) {
+    if (form) {
+      form.hass = hass;
+    }
+  }
+}
+
+function pickBatteryColorOverrides(colors) {
+  const source = colors && typeof colors === "object" ? colors : {};
+  return {
+    track: source.track || DEFAULT_CONFIG.colors.track,
+    text_light: source.text_light || source.text || DEFAULT_CONFIG.colors.text_light,
+    text_dark: source.text_dark || source.text || DEFAULT_CONFIG.colors.text_dark,
+    divider: source.divider || DEFAULT_CONFIG.colors.divider,
+    energy_storage_in: source.energy_storage_in || DEFAULT_CONFIG.colors.energy_storage_in,
+    energy_storage_out: source.energy_storage_out || DEFAULT_CONFIG.colors.energy_storage_out,
+    home_load: source.home_load || DEFAULT_CONFIG.colors.home_load,
+  };
+}
+
+function pickBatteryEditorColorOverrides(colors) {
+  const source = colors && typeof colors === "object" ? colors : {};
+  return {
+    track: source.track || "",
+    text_light: source.text_light || source.text || "",
+    text_dark: source.text_dark || source.text || "",
+    divider: source.divider || "",
+    energy_storage_in: source.energy_storage_in || "",
+    energy_storage_out: source.energy_storage_out || "",
+    home_load: source.home_load || "",
+  };
+}
+
+function pickBackgroundColor(colors) {
+  if (!colors || typeof colors !== "object" || typeof colors.background !== "string" || colors.background.trim().length === 0) {
+    return {};
+  }
+  const background = colors.background.trim();
+  if (background.toUpperCase() === DEFAULT_CONFIG.colors.background) {
+    return {};
+  }
+  return { background };
+}
+
+function resolveEditorBackgroundColor(formColors, fallbackColors) {
+  if (formColors && typeof formColors === "object" && Object.prototype.hasOwnProperty.call(formColors, "background")) {
+    return pickBackgroundColor(formColors);
+  }
+  return pickBackgroundColor(fallbackColors);
+}
+
+function resolveEditorTrackBlend(rawConfig, fallback) {
+  const trackBlend = Number(rawConfig?.track_blend);
+  if (!Number.isFinite(trackBlend)) {
+    return fallback;
+  }
+  return Math.min(0.4, Math.max(0.1, trackBlend));
+}
+
+function normalizeTrackBlendOverrideValue(value, fallback) {
+  const trackBlend = Number(value);
+  if (!Number.isFinite(trackBlend)) {
+    return fallback;
+  }
+  return Math.min(0.4, Math.max(0.1, trackBlend));
+}
+
+function migrateLegacyBatteryColors(config) {
+  if (!config || typeof config !== "object" || !config.colors || typeof config.colors !== "object") {
+    return config;
+  }
+
+  const colors = config.colors;
+  const nextColors = {
+    ...colors,
+  };
+
+  let changed = false;
+
+  if (!nextColors.energy_storage_in && typeof colors.battery_charge === "string") {
+    nextColors.energy_storage_in = colors.battery_charge;
+    changed = true;
+  }
+  if (!nextColors.energy_storage_out && typeof colors.battery_discharge === "string") {
+    nextColors.energy_storage_out = colors.battery_discharge;
+    changed = true;
+  }
+  if (!nextColors.home_load && typeof colors.battery_idle === "string") {
+    nextColors.home_load = colors.battery_idle;
+    changed = true;
+  }
+  if (!nextColors.text_light && typeof colors.text === "string") {
+    nextColors.text_light = colors.text;
+    changed = true;
+  }
+  if (!nextColors.text_dark && typeof colors.text === "string") {
+    nextColors.text_dark = colors.text;
+    changed = true;
+  }
+
+  if ("battery_charge" in nextColors) {
+    delete nextColors.battery_charge;
+    changed = true;
+  }
+  if ("battery_discharge" in nextColors) {
+    delete nextColors.battery_discharge;
+    changed = true;
+  }
+  if ("battery_idle" in nextColors) {
+    delete nextColors.battery_idle;
+    changed = true;
+  }
+  if ("text" in nextColors) {
+    delete nextColors.text;
+    changed = true;
+  }
+
+  if (!changed) {
+    return config;
+  }
+
+  return {
+    ...config,
+    colors: nextColors,
+  };
 }

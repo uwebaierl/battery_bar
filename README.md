@@ -9,10 +9,16 @@ Battery Bar is a compact Home Assistant Lovelace custom card that displays a sum
 
 - Three-column layout: Summary, Battery 1, Battery 2
 - Primary SoC value with compact secondary metrics
-- Nested YAML configuration with `entities`, `decimals`, and `colors`
-- Per-metric decimal controls
-- Built-in visual editor for layout, colors, decimals, and entities
+- Nested YAML configuration with `entities` and `colors`
+- Global semantic `color_preset` themes shared across all three cards
+- Uses Home Assistant's own localized entity formatting and entity-level display precision
+- Built-in visual editor for layout, colors, and entities
+- The visual editor uses a dedicated Colors section in the same native Home Assistant expandable panel stack as layout and entities, with a preset selector and an optional custom-color override toggle
+- Visual editor automatically removes legacy config keys it knows how to migrate
+- Turning off manual color overrides makes the selected preset apply fully again
 - Individually clickable values that open Home Assistant `more-info`
+- Configured metrics stay visible as `—` when their entity is missing or unavailable, while omitted metrics are not treated as `0`
+- `battery_count: 1` works as a true single-battery mode without requiring Battery 2 entities
 - Adjustable height and corner radius to match [Bubble Card](https://github.com/Clooos/Bubble-Card) layouts cleanly
 
 ## Combined Setup
@@ -71,8 +77,9 @@ type: custom:battery-bar
 battery_count: 2
 bar_height: 56
 corner_radius: 28
-track_blend: 0.2
 background_transparent: true
+color_preset: preset_1
+track_blend: 0.2
 entities:
   battery_charge: sensor.battery_charge_power
   battery_discharge: sensor.battery_discharge_power
@@ -85,19 +92,15 @@ entities:
   battery2_soc: sensor.battery_2_soc
   battery2_temp: sensor.battery_2_max_cell_temperature
   battery2_voltage: sensor.battery_2_total_voltage
-decimals:
-  soc: 0
-  energy: 2
-  temperature: 0
-  voltage: 1
 colors:
-  background: "#4CAF8E"
+  background: "#000000"
   track: "#EAECEF"
-  text: "#2E2E2E"
-  divider: "#F4F7FA"
-  battery_charge: "#4CAF8E"
-  battery_discharge: "#2E8B75"
-  battery_idle: "#9FA8B2"
+  text_light: "#F4F7FA"
+  text_dark: "#2E2E2E"
+  divider: "#DBDDE0"
+  energy_storage_in: "#4CAF8E"
+  energy_storage_out: "#2E8B75"
+  home_load: "#9FA8B2"
 ```
 
 ## Options
@@ -105,26 +108,35 @@ colors:
 | Option                                | Default           | Notes                                                                 |
 | ------------------------------------- | ----------------- | --------------------------------------------------------------------- |
 | `type`                                | required          | Must be `custom:battery-bar`                                          |
-| `battery_count`                       | `2`               | Set to `1` to hide the second battery section                         |
+| `battery_count`                       | `2`               | Set to `1` for true single-battery mode; Battery 2 entities then become optional |
 | `bar_height`                          | `56`              | Clamp range `24..72`                                                  |
 | `corner_radius`                       | `28`              | Clamp range `0..30`                                                   |
-| `track_blend`                         | `0.2`             | Controls how strongly charge or discharge colors blend into the track |
 | `background_transparent`              | `true`            | Transparent background when enabled                                   |
+| `color_preset`                        | `preset_1`        | Global semantic preset baseline shared across all three cards         |
+| `track_blend`                         | preset-dependent  | Range `0.10..0.40`; optional manual override for track/color mixing   |
 | `entities.*`                          | defaults provided | Entity mapping for charge/discharge, summary, and both batteries      |
 | `entities.summary_device_temperature` | default sensor    | Device temperature shown next to summary energy                       |
-| `decimals.soc`                        | `0`               | Clamp range `0..2`                                                    |
-| `decimals.energy`                     | `2`               | Clamp range `0..2`                                                    |
-| `decimals.temperature`                | `0`               | Clamp range `0..2`                                                    |
-| `decimals.voltage`                    | `1`               | Clamp range `0..2`                                                    |
-| `colors.background`                   | `#4CAF8E`         | Outer card background                                                 |
+| `entities.battery2_*`                 | default sensors   | Required only when `battery_count` is `2`; optional in single-battery mode |
+| `colors.background`                   | `#000000`         | Outer card background                                                 |
 | `colors.track`                        | `#EAECEF`         | Base track color before charge/discharge blending                     |
-| `colors.text`                         | `#2E2E2E`         | Text and icon color                                                   |
-| `colors.divider`                      | `#F4F7FA`         | Divider color between Summary, Battery 1, and Battery 2               |
-| `colors.battery_charge`               | `#4CAF8E`         | Charge accent blended into the track                                  |
-| `colors.battery_discharge`            | `#2E8B75`         | Discharge accent blended into the track                               |
-| `colors.battery_idle`                 | `#9FA8B2`         | Idle accent blended into the track when charge and discharge are `0`  |
+| `colors.text_light`                   | `#F4F7FA`         | Light text/icon color used when it gives better contrast              |
+| `colors.text_dark`                    | `#2E2E2E`         | Dark text/icon color used when it gives better contrast               |
+| `colors.divider`                      | `#DBDDE0`         | Divider color between Summary, Battery 1, and Battery 2               |
+| `colors.energy_storage_in`            | `#4CAF8E`         | Battery charging accent blended into the track                        |
+| `colors.energy_storage_out`           | `#2E8B75`         | Battery discharging accent blended into the track                     |
+| `colors.home_load`                    | `#9FA8B2`         | Neutral/idle accent blended into the track when charge and discharge are `0` |
 
-Track color priority: `battery_discharge` > `battery_charge` > `battery_idle`.
+Track color priority: `energy_storage_out` > `energy_storage_in` > `home_load`.
+
+Color resolution priority for preset-controlled colors: built-in fallback < selected `color_preset` < manual `colors.*` overrides.
+
+Legacy `colors.text` is still accepted and is migrated to both `colors.text_light` and `colors.text_dark`.
+
+`colors.background` stays separate from presets and controls only the outer card background. In the visual editor it is only written to YAML when you explicitly set a non-default background override.
+
+In the visual editor, `Use custom color overrides` turns manual semantic colors and `track_blend` on or off. Background stays independent in `Layout & Motion`, so changing the card background does not activate manual color overrides or block presets.
+
+Preset styles: `preset_1` Classic, `preset_2` Industrial, `preset_3` Coffee, `preset_4` Ocean, `preset_5` Forest.
 
 ## Development
 

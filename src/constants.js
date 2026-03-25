@@ -4,6 +4,7 @@ export const CARD_NAME = "Battery Bar";
 
 export const DEFAULT_CONFIG = {
   type: CARD_TYPE,
+  color_preset: "preset_1",
   battery_count: 2,
   bar_height: 56,
   corner_radius: 28,
@@ -22,24 +23,19 @@ export const DEFAULT_CONFIG = {
     battery2_temp: "sensor.battery_2_max_cell_temperature",
     battery2_voltage: "sensor.battery_2_total_voltage",
   },
-  decimals: {
-    soc: 0,
-    energy: 2,
-    temperature: 0,
-    voltage: 1,
-  },
   colors: {
-    background: "#4CAF8E",
+    background: "#000000",
     track: "#EAECEF",
-    text: "#2E2E2E",
-    divider: "#F4F7FA",
-    battery_charge: "#4CAF8E",
-    battery_discharge: "#2E8B75",
-    battery_idle: "#9FA8B2",
+    text_light: "#F4F7FA",
+    text_dark: "#2E2E2E",
+    divider: "#DBDDE0",
+    energy_storage_in: "#4CAF8E",
+    energy_storage_out: "#2E8B75",
+    home_load: "#9FA8B2",
   },
 };
 
-export const ENTITY_KEYS = [
+export const REQUIRED_ENTITY_KEYS = [
   "battery_charge",
   "battery_discharge",
   "summary_soc",
@@ -48,10 +44,20 @@ export const ENTITY_KEYS = [
   "battery1_soc",
   "battery1_temp",
   "battery1_voltage",
+];
+export const BATTERY2_ENTITY_KEYS = [
   "battery2_soc",
   "battery2_temp",
   "battery2_voltage",
 ];
-
-export const DECIMAL_KEYS = ["soc", "energy", "temperature", "voltage"];
-export const COLOR_KEYS = ["background", "track", "text", "divider", "battery_charge", "battery_discharge", "battery_idle"];
+export const ENTITY_KEYS = [...REQUIRED_ENTITY_KEYS, ...BATTERY2_ENTITY_KEYS];
+export const COLOR_KEYS = [
+  "background",
+  "track",
+  "text_light",
+  "text_dark",
+  "divider",
+  "energy_storage_in",
+  "energy_storage_out",
+  "home_load",
+];

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -7,12 +8,16 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const srcRoot = path.join(projectRoot, "src");
 const distRoot = path.join(projectRoot, "dist");
+const workspaceSharedRoot = path.resolve(projectRoot, "..", "shared", "card_core");
+const localSharedRoot = path.join(srcRoot, "_shared");
+const localTestScript = path.resolve(projectRoot, "..", "local_test", "build-test-bundles.mjs");
 
 const entryFile = path.join(srcRoot, "index.js");
 
 const visited = new Set();
 const orderedFiles = [];
 
+syncSharedCore();
 visit(entryFile);
 
 const banner = "/* Battery Bar - generated file. Do not edit directly. */\n";
@@ -21,8 +26,48 @@ const output = `${banner}${body}\n`;
 
 fs.mkdirSync(distRoot, { recursive: true });
 fs.writeFileSync(path.join(distRoot, "battery_bar.js"), output, "utf8");
+syncLocalTestBundle("battery_bar");
 
 console.log(`Built dist/battery_bar.js from ${orderedFiles.length} source files.`);
+
+function syncSharedCore() {
+  if (!fs.existsSync(workspaceSharedRoot)) {
+    return;
+  }
+  copyDirectory(workspaceSharedRoot, localSharedRoot);
+}
+
+function copyDirectory(sourceDir, targetDir) {
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
+
+    if (entry.isDirectory()) {
+      copyDirectory(sourcePath, targetPath);
+      continue;
+    }
+
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.copyFileSync(sourcePath, targetPath);
+  }
+}
+
+function syncLocalTestBundle(bundleKey) {
+  if (!fs.existsSync(localTestScript)) {
+    return;
+  }
+
+  const result = spawnSync(process.execPath, [localTestScript, bundleKey], {
+    cwd: projectRoot,
+    stdio: "inherit",
+  });
+
+  if (result.status !== 0) {
+    throw new Error(`Failed to update local_test bundle for ${bundleKey}.`);
+  }
+}
 
 function visit(file) {
   const resolved = resolveFile(file);

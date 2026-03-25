@@ -1,5 +1,6 @@
-const UNAVAILABLE_STATES = new Set(["", "unknown", "unavailable", "none", "null", "nan"]);
-const formatterCache = new Map();
+import { resolveEntityStatus } from "./_shared/availability.js";
+import { formatEntityStateValue } from "./_shared/entity-format.js";
+
 const DEFAULT_METRIC_ICONS = {
   soc: "mdi:battery-medium",
   energy: "mdi:home-battery-outline",
@@ -32,69 +33,67 @@ export function collectRelevantEntities(config) {
     .filter((entityId) => typeof entityId === "string" && entityId.length > 0);
 }
 
-export function computeEntitySignature(hass, entityIds) {
-  return entityIds
-    .map((entityId) => {
-      const state = hass?.states?.[entityId];
-      if (!state) {
-        return `${entityId}:missing`;
-      }
-      const unit = state.attributes?.unit_of_measurement ?? "";
-      return `${entityId}:${state.state}:${unit}`;
-    })
-    .join("|");
-}
-
 export function buildCardModel(config, hass) {
   const entities = config?.entities || {};
-  const decimals = config?.decimals || {};
   const batteryCount = config?.battery_count || 2;
 
   return {
     summary: {
-      primary: buildMetricView(hass, entities.summary_soc, "soc", decimals.soc, "Total state of charge"),
+      primary: buildMetricView(hass, entities.summary_soc, "soc", "Total state of charge"),
       chips: [
-        buildMetricView(hass, entities.summary_energy, "energy", decimals.energy, "Available energy"),
+        buildMetricView(hass, entities.summary_energy, "energy", "Available energy"),
         buildMetricView(
           hass,
           entities.summary_device_temperature,
           "temperature",
-          decimals.temperature,
           "Device temperature",
         ),
       ],
     },
     battery1: {
-      primary: buildMetricView(hass, entities.battery1_soc, "soc", decimals.soc, "Battery 1 state of charge"),
+      primary: buildMetricView(hass, entities.battery1_soc, "soc", "Battery 1 state of charge"),
       chips: [
-        buildMetricView(hass, entities.battery1_voltage, "voltage", decimals.voltage, "Battery 1 total voltage"),
-        buildMetricView(hass, entities.battery1_temp, "temperature", decimals.temperature, "Battery 1 max cell temperature"),
+        buildMetricView(hass, entities.battery1_voltage, "voltage", "Battery 1 total voltage"),
+        buildMetricView(hass, entities.battery1_temp, "temperature", "Battery 1 max cell temperature"),
       ],
     },
     battery2: batteryCount === 2
       ? {
-        primary: buildMetricView(hass, entities.battery2_soc, "soc", decimals.soc, "Battery 2 state of charge"),
+        primary: buildMetricView(hass, entities.battery2_soc, "soc", "Battery 2 state of charge"),
         chips: [
-          buildMetricView(hass, entities.battery2_voltage, "voltage", decimals.voltage, "Battery 2 total voltage"),
-          buildMetricView(hass, entities.battery2_temp, "temperature", decimals.temperature, "Battery 2 max cell temperature"),
+          buildMetricView(hass, entities.battery2_voltage, "voltage", "Battery 2 total voltage"),
+          buildMetricView(hass, entities.battery2_temp, "temperature", "Battery 2 max cell temperature"),
         ],
       }
       : null,
   };
 }
 
-function buildMetricView(hass, entityId, kind, decimals, fallbackLabel) {
+function buildMetricView(hass, entityId, kind, fallbackLabel) {
   const stateObj = entityId ? hass?.states?.[entityId] : null;
+  const status = resolveEntityStatus(entityId, stateObj);
   const friendlyName = stateObj?.attributes?.friendly_name || fallbackLabel;
-  const value = formatMetricValue(stateObj, kind, decimals);
+  const value = formatMetricValue(hass, stateObj);
 
   return {
-    entityId: entityId || "",
+    entityId: status === "ready" ? entityId || "" : "",
     icon: resolveMetricIcon(stateObj, kind),
     value,
-    title: entityId ? `${friendlyName}: ${value}` : fallbackLabel,
-    available: Boolean(entityId),
+    title: buildMetricTitle(friendlyName, fallbackLabel, value, status),
+    available: status === "ready",
+    configured: status !== "omitted",
+    status,
   };
+}
+
+function buildMetricTitle(friendlyName, fallbackLabel, value, status) {
+  if (status === "ready") {
+    return `${friendlyName}: ${value}`;
+  }
+  if (status === "omitted") {
+    return fallbackLabel;
+  }
+  return `${friendlyName}: unavailable`;
 }
 
 function resolveMetricIcon(stateObj, kind) {
@@ -125,28 +124,8 @@ function resolveSocIcon(rawState) {
   return `mdi:battery-${bucket}`;
 }
 
-function formatMetricValue(stateObj, kind, decimals) {
-  if (!stateObj) {
-    return "—";
-  }
-
-  const raw = `${stateObj.state ?? ""}`.trim();
-  if (isUnavailable(raw)) {
-    return "—";
-  }
-
-  const numeric = parseNumericState(raw);
-  if (numeric === null) {
-    return raw;
-  }
-
-  if (kind === "soc") {
-    return `${formatNumber(numeric, decimals)}%`;
-  }
-
-  const unit = `${stateObj.attributes?.unit_of_measurement ?? ""}`.trim();
-  const suffix = unit ? ` ${unit}` : "";
-  return `${formatNumber(numeric, decimals)}${suffix}`;
+function formatMetricValue(hass, stateObj) {
+  return formatEntityStateValue(hass, stateObj);
 }
 
 function parseNumericState(raw) {
@@ -168,21 +147,4 @@ function parseNumericState(raw) {
 
   const parsed = Number(match[0]);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function formatNumber(value, decimals) {
-  const key = `${decimals}`;
-  let formatter = formatterCache.get(key);
-  if (!formatter) {
-    formatter = new Intl.NumberFormat(undefined, {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    });
-    formatterCache.set(key, formatter);
-  }
-  return formatter.format(value);
-}
-
-function isUnavailable(raw) {
-  return UNAVAILABLE_STATES.has(`${raw ?? ""}`.trim().toLowerCase());
 }

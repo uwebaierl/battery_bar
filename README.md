@@ -66,7 +66,7 @@ url: /local/community/battery_bar/battery_bar.js
 type: module
 ```
 
-## Full Example
+## Card YAML
 
 ```yaml
 type: custom:battery-bar
@@ -75,6 +75,7 @@ bar_height: 56
 corner_radius: 28
 background_transparent: true
 color_preset: preset_1
+# Optional: only set this when overriding the preset-driven track blend
 track_blend: 0.2
 entities:
   battery_charge: sensor.battery_charge_power
@@ -88,6 +89,7 @@ entities:
   battery2_soc: sensor.battery_2_soc
   battery2_temp: sensor.battery_2_max_cell_temperature
   battery2_voltage: sensor.battery_2_total_voltage
+# Optional: add this block only when using manual color overrides
 colors:
   background: "#000000"
   track: "#EAECEF"

@@ -29,35 +29,10 @@ function formatEntityStateValue(hass, stateObj, overrideState) {
     return "—";
   }
 
-  if (typeof hass?.formatEntityState === "function") {
-    try {
-      return hass.formatEntityState(stateObj, String(raw));
-    } catch (_error) {
-      // Fall back to a basic raw-state formatter for older HA versions.
-    }
-  }
-
-  return fallbackFormatEntityState(stateObj, raw);
-}
-
-function fallbackFormatEntityState(stateObj, raw) {
-  const text = String(raw ?? "").trim();
-  if (!text) {
-    return "—";
-  }
-
-  const unit = `${stateObj.attributes?.unit_of_measurement ?? ""}`.trim();
-  return unit ? `${text} ${unit}` : text;
+  return hass.formatEntityState(stateObj, String(raw));
 }
 
 /* src/battery-model.js */
-const DEFAULT_METRIC_ICONS = {
-  soc: "mdi:battery-medium",
-  energy: "mdi:home-battery-outline",
-  temperature: "mdi:thermometer",
-  voltage: "mdi:sine-wave",
-};
-
 function collectRelevantEntities(config) {
   const entities = config?.entities || {};
   const ids = [
@@ -89,114 +64,60 @@ function buildCardModel(config, hass) {
 
   return {
     summary: {
-      primary: buildMetricView(hass, entities.summary_soc, "soc", "Total state of charge"),
+      primary: buildMetricView(hass, entities.summary_soc),
       chips: [
-        buildMetricView(hass, entities.summary_energy, "energy", "Available energy"),
-        buildMetricView(
-          hass,
-          entities.summary_device_temperature,
-          "temperature",
-          "Device temperature",
-        ),
+        buildMetricView(hass, entities.summary_energy),
+        buildMetricView(hass, entities.summary_device_temperature),
       ],
     },
     battery1: {
-      primary: buildMetricView(hass, entities.battery1_soc, "soc", "Battery 1 state of charge"),
+      primary: buildMetricView(hass, entities.battery1_soc),
       chips: [
-        buildMetricView(hass, entities.battery1_voltage, "voltage", "Battery 1 total voltage"),
-        buildMetricView(hass, entities.battery1_temp, "temperature", "Battery 1 max cell temperature"),
+        buildMetricView(hass, entities.battery1_voltage),
+        buildMetricView(hass, entities.battery1_temp),
       ],
     },
     battery2: batteryCount === 2
       ? {
-        primary: buildMetricView(hass, entities.battery2_soc, "soc", "Battery 2 state of charge"),
+        primary: buildMetricView(hass, entities.battery2_soc),
         chips: [
-          buildMetricView(hass, entities.battery2_voltage, "voltage", "Battery 2 total voltage"),
-          buildMetricView(hass, entities.battery2_temp, "temperature", "Battery 2 max cell temperature"),
+          buildMetricView(hass, entities.battery2_voltage),
+          buildMetricView(hass, entities.battery2_temp),
         ],
       }
       : null,
   };
 }
 
-function buildMetricView(hass, entityId, kind, fallbackLabel) {
+function buildMetricView(hass, entityId) {
   const stateObj = entityId ? hass?.states?.[entityId] : null;
   const status = resolveEntityStatus(entityId, stateObj);
-  const friendlyName = stateObj?.attributes?.friendly_name || fallbackLabel;
+  const label = `${stateObj?.attributes?.friendly_name ?? ""}`.trim() || `${entityId ?? ""}`.trim();
   const value = formatMetricValue(hass, stateObj);
 
   return {
     entityId: status === "ready" ? entityId || "" : "",
-    icon: resolveMetricIcon(stateObj, kind),
+    stateObj: stateObj || null,
     value,
-    title: buildMetricTitle(friendlyName, fallbackLabel, value, status),
+    title: buildMetricTitle(label, value, status),
     available: status === "ready",
     configured: status !== "omitted",
     status,
   };
 }
 
-function buildMetricTitle(friendlyName, fallbackLabel, value, status) {
+function buildMetricTitle(label, value, status) {
   if (status === "ready") {
-    return `${friendlyName}: ${value}`;
+    return label ? `${label}: ${value}` : value;
   }
   if (status === "omitted") {
-    return fallbackLabel;
+    return "";
   }
-  return `${friendlyName}: unavailable`;
-}
-
-function resolveMetricIcon(stateObj, kind) {
-  const explicitIcon = `${stateObj?.attributes?.icon ?? ""}`.trim();
-  if (explicitIcon) {
-    return explicitIcon;
-  }
-  if (kind === "soc") {
-    return resolveSocIcon(stateObj?.state);
-  }
-  return DEFAULT_METRIC_ICONS[kind] || "";
-}
-
-function resolveSocIcon(rawState) {
-  const numeric = parseNumericState(rawState);
-  if (numeric === null) {
-    return DEFAULT_METRIC_ICONS.soc;
-  }
-
-  if (numeric >= 95) {
-    return "mdi:battery";
-  }
-  if (numeric <= 5) {
-    return "mdi:battery-outline";
-  }
-
-  const bucket = Math.min(90, Math.max(10, Math.round(numeric / 10) * 10));
-  return `mdi:battery-${bucket}`;
+  return label ? `${label}: unavailable` : "unavailable";
 }
 
 function formatMetricValue(hass, stateObj) {
   return formatEntityStateValue(hass, stateObj);
-}
-
-function parseNumericState(raw) {
-  const trimmed = `${raw ?? ""}`.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  const direct = Number(trimmed);
-  if (Number.isFinite(direct)) {
-    return direct;
-  }
-
-  const normalized = trimmed.replace(",", ".");
-  const match = normalized.match(/^-?\d+(?:\.\d+)?/);
-  if (!match) {
-    return null;
-  }
-
-  const parsed = Number(match[0]);
-  return Number.isFinite(parsed) ? parsed : null;
 }
 
 /* src/_shared/color-presets.js */
@@ -641,27 +562,20 @@ const DEFAULT_CONFIG = {
   track_blend: 0.2,
   background_transparent: true,
   entities: {
-    battery_charge: "sensor.battery_charge_power",
-    battery_discharge: "sensor.battery_discharge_power",
-    summary_soc: "sensor.battery_system_soc",
-    summary_energy: "sensor.battery_available_energy",
-    summary_device_temperature: "sensor.battery_device_temperature",
-    battery1_soc: "sensor.battery_1_soc",
-    battery1_temp: "sensor.battery_1_max_cell_temperature",
-    battery1_voltage: "sensor.battery_1_total_voltage",
-    battery2_soc: "sensor.battery_2_soc",
-    battery2_temp: "sensor.battery_2_max_cell_temperature",
-    battery2_voltage: "sensor.battery_2_total_voltage",
+    battery_charge: "",
+    battery_discharge: "",
+    summary_soc: "",
+    summary_energy: "",
+    summary_device_temperature: "",
+    battery1_soc: "",
+    battery1_temp: "",
+    battery1_voltage: "",
+    battery2_soc: "",
+    battery2_temp: "",
+    battery2_voltage: "",
   },
   colors: {
     background: "#000000",
-    track: "#EAECEF",
-    text_light: "#F4F7FA",
-    text_dark: "#2E2E2E",
-    divider: "#DBDDE0",
-    energy_storage_in: "#4CAF8E",
-    energy_storage_out: "#2E8B75",
-    home_load: "#9FA8B2",
   },
 };
 
@@ -750,52 +664,51 @@ function validateConfig(config) {
 
 function normalizeConfig(config) {
   const source = config && typeof config === "object" ? config : {};
-  const batteryCount = clampInteger(source.battery_count, 1, 2, DEFAULT_CONFIG.battery_count);
+  const batteryCount = source.battery_count === undefined
+    ? DEFAULT_CONFIG.battery_count
+    : Number(source.battery_count);
   const entitiesInput = source.entities && typeof source.entities === "object" ? source.entities : {};
   const colorsInput = source.colors && typeof source.colors === "object" ? source.colors : {};
 
   return {
     type: CARD_TYPE,
-    color_preset: normalizeColorPresetName(source.color_preset),
+    color_preset: source.color_preset === undefined ? DEFAULT_CONFIG.color_preset : source.color_preset,
     battery_count: batteryCount,
-    bar_height: clampNumber(source.bar_height, 24, 72, DEFAULT_CONFIG.bar_height),
-    corner_radius: clampNumber(source.corner_radius, 0, 30, DEFAULT_CONFIG.corner_radius),
-    track_blend: clampNumber(
-      source.track_blend,
-      0.1,
-      0.4,
-      resolveColorPresetTrackBlend(source.color_preset, DEFAULT_CONFIG.track_blend),
-    ),
-    background_transparent: typeof source.background_transparent === "boolean"
-      ? source.background_transparent
-      : DEFAULT_CONFIG.background_transparent,
+    bar_height: source.bar_height === undefined ? DEFAULT_CONFIG.bar_height : Number(source.bar_height),
+    corner_radius: source.corner_radius === undefined ? DEFAULT_CONFIG.corner_radius : Number(source.corner_radius),
+    track_blend: source.track_blend === undefined
+      ? resolveColorPresetTrackBlend(source.color_preset, DEFAULT_CONFIG.track_blend)
+      : Number(source.track_blend),
+    background_transparent: source.background_transparent === undefined
+      ? DEFAULT_CONFIG.background_transparent
+      : source.background_transparent,
     entities: {
-      battery_charge: normalizeEntity(entitiesInput.battery_charge, DEFAULT_CONFIG.entities.battery_charge),
-      battery_discharge: normalizeEntity(entitiesInput.battery_discharge, DEFAULT_CONFIG.entities.battery_discharge),
-      summary_soc: normalizeEntity(entitiesInput.summary_soc, DEFAULT_CONFIG.entities.summary_soc),
-      summary_energy: normalizeEntity(entitiesInput.summary_energy, DEFAULT_CONFIG.entities.summary_energy),
-      summary_device_temperature: normalizeEntity(
-        entitiesInput.summary_device_temperature,
-        DEFAULT_CONFIG.entities.summary_device_temperature,
-      ),
-      battery1_soc: normalizeEntity(entitiesInput.battery1_soc, DEFAULT_CONFIG.entities.battery1_soc),
-      battery1_temp: normalizeEntity(entitiesInput.battery1_temp, DEFAULT_CONFIG.entities.battery1_temp),
-      battery1_voltage: normalizeEntity(entitiesInput.battery1_voltage, DEFAULT_CONFIG.entities.battery1_voltage),
+      battery_charge: normalizeEntity(entitiesInput.battery_charge),
+      battery_discharge: normalizeEntity(entitiesInput.battery_discharge),
+      summary_soc: normalizeEntity(entitiesInput.summary_soc),
+      summary_energy: normalizeEntity(entitiesInput.summary_energy),
+      summary_device_temperature: normalizeEntity(entitiesInput.summary_device_temperature),
+      battery1_soc: normalizeEntity(entitiesInput.battery1_soc),
+      battery1_temp: normalizeEntity(entitiesInput.battery1_temp),
+      battery1_voltage: normalizeEntity(entitiesInput.battery1_voltage),
       battery2_soc: batteryCount === 2
-        ? normalizeEntity(entitiesInput.battery2_soc, DEFAULT_CONFIG.entities.battery2_soc)
+        ? normalizeEntity(entitiesInput.battery2_soc)
         : normalizeOptionalEntity(entitiesInput.battery2_soc),
       battery2_temp: batteryCount === 2
-        ? normalizeEntity(entitiesInput.battery2_temp, DEFAULT_CONFIG.entities.battery2_temp)
+        ? normalizeEntity(entitiesInput.battery2_temp)
         : normalizeOptionalEntity(entitiesInput.battery2_temp),
       battery2_voltage: batteryCount === 2
-        ? normalizeEntity(entitiesInput.battery2_voltage, DEFAULT_CONFIG.entities.battery2_voltage)
+        ? normalizeEntity(entitiesInput.battery2_voltage)
         : normalizeOptionalEntity(entitiesInput.battery2_voltage),
     },
-    colors: mergeColorPresetTokens(
-      source.color_preset,
-      DEFAULT_CONFIG.colors,
-      normalizeColorOverrides(colorsInput),
-    ),
+    colors: {
+      background: normalizeColor(colorsInput.background, DEFAULT_CONFIG.colors.background),
+      ...mergeColorPresetTokens(
+        source.color_preset,
+        {},
+        normalizeColorOverrides(colorsInput),
+      ),
+    },
   };
 }
 
@@ -813,27 +726,11 @@ function validateIntegerRange(value, key, min, max) {
   }
 }
 
-function clampNumber(value, min, max, fallback) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) {
-    return fallback;
-  }
-  return Math.min(max, Math.max(min, n));
-}
-
-function clampInteger(value, min, max, fallback) {
-  const n = Number(value);
-  if (!Number.isInteger(n)) {
-    return fallback;
-  }
-  return Math.min(max, Math.max(min, n));
-}
-
 function validateColorPreset(value) {
   if (value === undefined) {
     return;
   }
-  if (!isKnownColorPreset(value)) {
+  if (typeof value !== "string" || !isKnownColorPreset(value)) {
     throw new Error("color_preset must be a supported preset name.");
   }
 }
@@ -845,9 +742,9 @@ function normalizeColor(value, fallback) {
   return value.trim();
 }
 
-function normalizeEntity(value, fallback) {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    return fallback;
+function normalizeEntity(value) {
+  if (typeof value !== "string") {
+    return "";
   }
   return value.trim();
 }
@@ -891,7 +788,6 @@ const CONFIG_CLEANUP_STEPS = [
   migrateLegacyBatteryColors,
 ];
 const EDITOR_CLEANUP_STEPS = [
-  createRemovePathsCleanup(["decimals"]),
   migrateLegacyBatteryColors,
 ];
 
@@ -1044,22 +940,22 @@ class BatteryBarCard extends HTMLElement {
       this._refs.battery2Section.style.display = singleBattery ? "none" : "";
     }
 
-    applyMetric(this._refs.summaryPrimary, model.summary.primary, { settleOnChange: true });
-    applyMetric(this._refs.summaryEnergy, model.summary.chips[0]);
-    applyMetric(this._refs.summaryDeviceTemperature, model.summary.chips[1]);
-    applyMetric(this._refs.battery1Primary, model.battery1.primary, { settleOnChange: true });
-    applyMetric(this._refs.battery1Voltage, model.battery1.chips[0]);
-    applyMetric(this._refs.battery1Temp, model.battery1.chips[1]);
+    applyMetric(this._hass, this._refs.summaryPrimary, model.summary.primary, { settleOnChange: true });
+    applyMetric(this._hass, this._refs.summaryEnergy, model.summary.chips[0]);
+    applyMetric(this._hass, this._refs.summaryDeviceTemperature, model.summary.chips[1]);
+    applyMetric(this._hass, this._refs.battery1Primary, model.battery1.primary, { settleOnChange: true });
+    applyMetric(this._hass, this._refs.battery1Voltage, model.battery1.chips[0]);
+    applyMetric(this._hass, this._refs.battery1Temp, model.battery1.chips[1]);
     if (model.battery2) {
-      applyMetric(this._refs.battery2Primary, model.battery2.primary, { settleOnChange: true });
-      applyMetric(this._refs.battery2Voltage, model.battery2.chips[0]);
-      applyMetric(this._refs.battery2Temp, model.battery2.chips[1]);
+      applyMetric(this._hass, this._refs.battery2Primary, model.battery2.primary, { settleOnChange: true });
+      applyMetric(this._hass, this._refs.battery2Voltage, model.battery2.chips[0]);
+      applyMetric(this._hass, this._refs.battery2Temp, model.battery2.chips[1]);
     }
   }
 
   _applyTheme() {
-    const config = this._config || DEFAULT_CONFIG;
-    const colors = config.colors || DEFAULT_CONFIG.colors;
+    const config = this._config || normalizeConfig(BatteryBarCard.getStubConfig());
+    const colors = config.colors;
     const trackBackground = resolveTrackBackground(config, this._hass);
     const textColor = pickBestTextColor(trackBackground, colors.text_light, colors.text_dark);
 
@@ -1182,7 +1078,7 @@ class BatteryBarEditor extends HTMLElement {
     if (useOverrides) {
       nextRaw.colors = {
         ...resolveEditorBackgroundColor(value.colors, this._rawConfig?.colors),
-        ...pickBatteryColorOverrides(this._config?.colors || DEFAULT_CONFIG.colors),
+        ...pickBatteryColorOverrides(this._config?.colors),
         ...(hadOverrides ? pickBatteryEditorColorOverrides(value.colors) : {}),
       };
       nextRaw.track_blend = normalizeTrackBlendOverrideValue(
@@ -1208,7 +1104,7 @@ class BatteryBarEditor extends HTMLElement {
 
 }
 
-function applyMetric(button, metric, options = {}) {
+function applyMetric(hass, button, metric, options = {}) {
   if (!button) {
     return;
   }
@@ -1228,14 +1124,7 @@ function applyMetric(button, metric, options = {}) {
 
   const iconEl = button.querySelector(".metric-icon");
   if (iconEl) {
-    const icon = metric?.icon || "";
-    if (icon) {
-      iconEl.setAttribute("icon", icon);
-      iconEl.hidden = false;
-    } else {
-      iconEl.removeAttribute("icon");
-      iconEl.hidden = true;
-    }
+    syncEntityIcon(iconEl, hass, metric?.stateObj || null);
   }
 
   if (options.settleOnChange && shouldAnimatePrimarySettle(previousValue, nextValue)) {
@@ -1248,10 +1137,29 @@ function buildMetricButton(ref, primary) {
   const iconClass = primary ? "metric-icon metric-icon--primary" : "metric-icon metric-icon--chip";
   return `
     <button class="${buttonClass}" data-ref="${ref}" type="button">
-      <ha-icon class="${iconClass}" hidden></ha-icon>
+      <ha-state-icon class="${iconClass}" hidden></ha-state-icon>
       <span class="metric-text">—</span>
     </button>
   `;
+}
+
+function syncEntityIcon(iconEl, hass, stateObj) {
+  if (!iconEl) {
+    return;
+  }
+
+  if (stateObj) {
+    iconEl.hass = hass || null;
+    iconEl.stateObj = stateObj;
+    iconEl.state = stateObj;
+    iconEl.hidden = false;
+    return;
+  }
+
+  iconEl.hass = hass || null;
+  iconEl.stateObj = null;
+  iconEl.state = null;
+  iconEl.hidden = true;
 }
 
 function shouldAnimatePrimarySettle(previousValue, nextValue) {
@@ -1720,13 +1628,13 @@ function syncEditorFormsHass(forms, hass) {
 function pickBatteryColorOverrides(colors) {
   const source = colors && typeof colors === "object" ? colors : {};
   return {
-    track: source.track || DEFAULT_CONFIG.colors.track,
-    text_light: source.text_light || source.text || DEFAULT_CONFIG.colors.text_light,
-    text_dark: source.text_dark || source.text || DEFAULT_CONFIG.colors.text_dark,
-    divider: source.divider || DEFAULT_CONFIG.colors.divider,
-    energy_storage_in: source.energy_storage_in || DEFAULT_CONFIG.colors.energy_storage_in,
-    energy_storage_out: source.energy_storage_out || DEFAULT_CONFIG.colors.energy_storage_out,
-    home_load: source.home_load || DEFAULT_CONFIG.colors.home_load,
+    track: source.track || "",
+    text_light: source.text_light || source.text || "",
+    text_dark: source.text_dark || source.text || "",
+    divider: source.divider || "",
+    energy_storage_in: source.energy_storage_in || "",
+    energy_storage_out: source.energy_storage_out || "",
+    home_load: source.home_load || "",
   };
 }
 

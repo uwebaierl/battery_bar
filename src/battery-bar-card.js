@@ -8,7 +8,6 @@ import {
   flushConfigCleanup,
   queueConfigCleanup,
   runConfigCleanup,
-  createRemovePathsCleanup,
 } from "./_shared/config-cleanup.js";
 import { blendHex, pickBestTextColor } from "./_shared/color.js";
 import { openMoreInfo } from "./_shared/interaction.js";
@@ -30,7 +29,6 @@ const CONFIG_CLEANUP_STEPS = [
   migrateLegacyBatteryColors,
 ];
 const EDITOR_CLEANUP_STEPS = [
-  createRemovePathsCleanup(["decimals"]),
   migrateLegacyBatteryColors,
 ];
 
@@ -183,22 +181,22 @@ export class BatteryBarCard extends HTMLElement {
       this._refs.battery2Section.style.display = singleBattery ? "none" : "";
     }
 
-    applyMetric(this._refs.summaryPrimary, model.summary.primary, { settleOnChange: true });
-    applyMetric(this._refs.summaryEnergy, model.summary.chips[0]);
-    applyMetric(this._refs.summaryDeviceTemperature, model.summary.chips[1]);
-    applyMetric(this._refs.battery1Primary, model.battery1.primary, { settleOnChange: true });
-    applyMetric(this._refs.battery1Voltage, model.battery1.chips[0]);
-    applyMetric(this._refs.battery1Temp, model.battery1.chips[1]);
+    applyMetric(this._hass, this._refs.summaryPrimary, model.summary.primary, { settleOnChange: true });
+    applyMetric(this._hass, this._refs.summaryEnergy, model.summary.chips[0]);
+    applyMetric(this._hass, this._refs.summaryDeviceTemperature, model.summary.chips[1]);
+    applyMetric(this._hass, this._refs.battery1Primary, model.battery1.primary, { settleOnChange: true });
+    applyMetric(this._hass, this._refs.battery1Voltage, model.battery1.chips[0]);
+    applyMetric(this._hass, this._refs.battery1Temp, model.battery1.chips[1]);
     if (model.battery2) {
-      applyMetric(this._refs.battery2Primary, model.battery2.primary, { settleOnChange: true });
-      applyMetric(this._refs.battery2Voltage, model.battery2.chips[0]);
-      applyMetric(this._refs.battery2Temp, model.battery2.chips[1]);
+      applyMetric(this._hass, this._refs.battery2Primary, model.battery2.primary, { settleOnChange: true });
+      applyMetric(this._hass, this._refs.battery2Voltage, model.battery2.chips[0]);
+      applyMetric(this._hass, this._refs.battery2Temp, model.battery2.chips[1]);
     }
   }
 
   _applyTheme() {
-    const config = this._config || DEFAULT_CONFIG;
-    const colors = config.colors || DEFAULT_CONFIG.colors;
+    const config = this._config || normalizeConfig(BatteryBarCard.getStubConfig());
+    const colors = config.colors;
     const trackBackground = resolveTrackBackground(config, this._hass);
     const textColor = pickBestTextColor(trackBackground, colors.text_light, colors.text_dark);
 
@@ -321,7 +319,7 @@ class BatteryBarEditor extends HTMLElement {
     if (useOverrides) {
       nextRaw.colors = {
         ...resolveEditorBackgroundColor(value.colors, this._rawConfig?.colors),
-        ...pickBatteryColorOverrides(this._config?.colors || DEFAULT_CONFIG.colors),
+        ...pickBatteryColorOverrides(this._config?.colors),
         ...(hadOverrides ? pickBatteryEditorColorOverrides(value.colors) : {}),
       };
       nextRaw.track_blend = normalizeTrackBlendOverrideValue(
@@ -347,7 +345,7 @@ class BatteryBarEditor extends HTMLElement {
 
 }
 
-function applyMetric(button, metric, options = {}) {
+function applyMetric(hass, button, metric, options = {}) {
   if (!button) {
     return;
   }
@@ -367,14 +365,7 @@ function applyMetric(button, metric, options = {}) {
 
   const iconEl = button.querySelector(".metric-icon");
   if (iconEl) {
-    const icon = metric?.icon || "";
-    if (icon) {
-      iconEl.setAttribute("icon", icon);
-      iconEl.hidden = false;
-    } else {
-      iconEl.removeAttribute("icon");
-      iconEl.hidden = true;
-    }
+    syncEntityIcon(iconEl, hass, metric?.stateObj || null);
   }
 
   if (options.settleOnChange && shouldAnimatePrimarySettle(previousValue, nextValue)) {
@@ -387,10 +378,29 @@ function buildMetricButton(ref, primary) {
   const iconClass = primary ? "metric-icon metric-icon--primary" : "metric-icon metric-icon--chip";
   return `
     <button class="${buttonClass}" data-ref="${ref}" type="button">
-      <ha-icon class="${iconClass}" hidden></ha-icon>
+      <ha-state-icon class="${iconClass}" hidden></ha-state-icon>
       <span class="metric-text">—</span>
     </button>
   `;
+}
+
+function syncEntityIcon(iconEl, hass, stateObj) {
+  if (!iconEl) {
+    return;
+  }
+
+  if (stateObj) {
+    iconEl.hass = hass || null;
+    iconEl.stateObj = stateObj;
+    iconEl.state = stateObj;
+    iconEl.hidden = false;
+    return;
+  }
+
+  iconEl.hass = hass || null;
+  iconEl.stateObj = null;
+  iconEl.state = null;
+  iconEl.hidden = true;
 }
 
 function shouldAnimatePrimarySettle(previousValue, nextValue) {
@@ -859,13 +869,13 @@ function syncEditorFormsHass(forms, hass) {
 function pickBatteryColorOverrides(colors) {
   const source = colors && typeof colors === "object" ? colors : {};
   return {
-    track: source.track || DEFAULT_CONFIG.colors.track,
-    text_light: source.text_light || source.text || DEFAULT_CONFIG.colors.text_light,
-    text_dark: source.text_dark || source.text || DEFAULT_CONFIG.colors.text_dark,
-    divider: source.divider || DEFAULT_CONFIG.colors.divider,
-    energy_storage_in: source.energy_storage_in || DEFAULT_CONFIG.colors.energy_storage_in,
-    energy_storage_out: source.energy_storage_out || DEFAULT_CONFIG.colors.energy_storage_out,
-    home_load: source.home_load || DEFAULT_CONFIG.colors.home_load,
+    track: source.track || "",
+    text_light: source.text_light || source.text || "",
+    text_dark: source.text_dark || source.text || "",
+    divider: source.divider || "",
+    energy_storage_in: source.energy_storage_in || "",
+    energy_storage_out: source.energy_storage_out || "",
+    home_load: source.home_load || "",
   };
 }
 

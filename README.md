@@ -112,21 +112,21 @@ colors:
 | `background_transparent`              | `true`            | Transparent background when enabled                                   |
 | `color_preset`                        | `preset_1`        | Global semantic preset baseline shared across all three cards         |
 | `track_blend`                         | preset-dependent  | Range `0.10..0.40`; optional manual override for track/color mixing   |
-| `entities.*`                          | defaults provided | Entity mapping for charge/discharge, summary, and both batteries      |
-| `entities.summary_device_temperature` | default sensor    | Device temperature shown next to summary energy                       |
-| `entities.battery2_*`                 | default sensors   | Required only when `battery_count` is `2`; optional in single-battery mode |
+| `entities.*`                          | required          | Entity mapping for charge/discharge, summary, and both batteries      |
+| `entities.summary_device_temperature` | required          | Device temperature shown next to summary energy                       |
+| `entities.battery2_*`                 | required when `battery_count` is `2` | Optional in single-battery mode |
 | `colors.background`                   | `#000000`         | Outer card background                                                 |
-| `colors.track`                        | `#EAECEF`         | Base track color before charge/discharge blending                     |
-| `colors.text_light`                   | `#F4F7FA`         | Light text/icon color used when it gives better contrast              |
-| `colors.text_dark`                    | `#2E2E2E`         | Dark text/icon color used when it gives better contrast               |
-| `colors.divider`                      | `#DBDDE0`         | Divider color between Summary, Battery 1, and Battery 2               |
-| `colors.energy_storage_in`            | `#4CAF8E`         | Battery charging accent blended into the track                        |
-| `colors.energy_storage_out`           | `#2E8B75`         | Battery discharging accent blended into the track                     |
-| `colors.home_load`                    | `#9FA8B2`         | Neutral/idle accent blended into the track when charge and discharge are `0` |
+| `colors.track`                        | preset-dependent  | Base track color before charge/discharge blending                     |
+| `colors.text_light`                   | preset-dependent  | Light text/icon color used when it gives better contrast              |
+| `colors.text_dark`                    | preset-dependent  | Dark text/icon color used when it gives better contrast               |
+| `colors.divider`                      | preset-dependent  | Divider color between Summary, Battery 1, and Battery 2               |
+| `colors.energy_storage_in`            | preset-dependent  | Battery charging accent blended into the track                        |
+| `colors.energy_storage_out`           | preset-dependent  | Battery discharging accent blended into the track                     |
+| `colors.home_load`                    | preset-dependent  | Neutral/idle accent blended into the track when charge and discharge are `0` |
 
 Track color priority: `energy_storage_out` > `energy_storage_in` > `home_load`.
 
-Color resolution priority for preset-controlled colors: built-in fallback < selected `color_preset` < manual `colors.*` overrides.
+Color resolution priority for preset-controlled colors: selected `color_preset` < manual `colors.*` overrides.
 
 Legacy `colors.text` is still accepted and is migrated to both `colors.text_light` and `colors.text_dark`.
 
@@ -135,6 +135,10 @@ Legacy `colors.text` is still accepted and is migrated to both `colors.text_ligh
 In the visual editor, `Use custom color overrides` turns manual semantic colors and `track_blend` on or off. Background stays independent in `Layout & Motion`, so changing the card background does not activate manual color overrides or block presets.
 
 Preset styles: `preset_1` Classic, `preset_2` Industrial, `preset_3` Coffee, `preset_4` Ocean, `preset_5` Forest.
+
+Visible metric icons always come from the configured Home Assistant entities.
+
+The card and visual editor no longer prefill entity ids.
 
 ## Development
 

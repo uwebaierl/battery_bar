@@ -7,6 +7,9 @@ The format is based on Keep a Changelog and this project uses Semantic Versionin
 ## [Unreleased]
 
 ### Changed
+- Removed prefilled example entity ids, removed hardcoded metric fallback labels/titles, and made preset colors the only semantic color baseline outside explicit manual overrides.
+- Removed the remaining legacy decimal cleanup and raw-state formatting fallback so displayed values now rely only on Home Assistant's entity formatting.
+- Removed hardcoded battery metric icon fallbacks so visible icons now always come from the configured Home Assistant entities.
 - Stopped persisting default `colors.background` in YAML from the visual editor when no explicit background override is set.
 - Updated the shared `Industrial`, `Coffee`, `Ocean`, and `Forest` preset palettes, including their `text_light` and `text_dark` values.
 - Added shared `text_light` and `text_dark` color tokens with automatic contrast-based text selection, while migrating legacy `colors.text` overrides to both tokens.
@@ -17,7 +20,6 @@ The format is based on Keep a Changelog and this project uses Semantic Versionin
 - Restored `track_blend` as an optional manual override, exposed it in the Colors section when custom overrides are enabled, and kept the `0.10..0.40` range.
 - Normalized unavailable metric handling so configured sensors stay visible as `—` and only ready metrics open Home Assistant `more-info`.
 - Switched value formatting to Home Assistant's native entity formatter and removed the card-specific decimal controls from docs/editor output.
-- Added a shared editor cleanup pipeline so legacy config keys like `decimals` are removed automatically in the visual editor.
 - Made `battery_count: 1` a true single-battery mode so Battery 2 entities are no longer required by validation, normalization, or the editor.
 - Added shared `color_preset` support with `preset_1` matching the current/default Battery Bar palette.
 - Manual `colors.*` entries now override the selected preset instead of being ignored.

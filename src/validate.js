@@ -8,7 +8,6 @@ import {
 import {
   isKnownColorPreset,
   mergeColorPresetTokens,
-  normalizeColorPresetName,
   resolveColorPresetTrackBlend,
 } from "./_shared/color-presets.js";
 
@@ -69,52 +68,51 @@ export function validateConfig(config) {
 
 export function normalizeConfig(config) {
   const source = config && typeof config === "object" ? config : {};
-  const batteryCount = clampInteger(source.battery_count, 1, 2, DEFAULT_CONFIG.battery_count);
+  const batteryCount = source.battery_count === undefined
+    ? DEFAULT_CONFIG.battery_count
+    : Number(source.battery_count);
   const entitiesInput = source.entities && typeof source.entities === "object" ? source.entities : {};
   const colorsInput = source.colors && typeof source.colors === "object" ? source.colors : {};
 
   return {
     type: CARD_TYPE,
-    color_preset: normalizeColorPresetName(source.color_preset),
+    color_preset: source.color_preset === undefined ? DEFAULT_CONFIG.color_preset : source.color_preset,
     battery_count: batteryCount,
-    bar_height: clampNumber(source.bar_height, 24, 72, DEFAULT_CONFIG.bar_height),
-    corner_radius: clampNumber(source.corner_radius, 0, 30, DEFAULT_CONFIG.corner_radius),
-    track_blend: clampNumber(
-      source.track_blend,
-      0.1,
-      0.4,
-      resolveColorPresetTrackBlend(source.color_preset, DEFAULT_CONFIG.track_blend),
-    ),
-    background_transparent: typeof source.background_transparent === "boolean"
-      ? source.background_transparent
-      : DEFAULT_CONFIG.background_transparent,
+    bar_height: source.bar_height === undefined ? DEFAULT_CONFIG.bar_height : Number(source.bar_height),
+    corner_radius: source.corner_radius === undefined ? DEFAULT_CONFIG.corner_radius : Number(source.corner_radius),
+    track_blend: source.track_blend === undefined
+      ? resolveColorPresetTrackBlend(source.color_preset, DEFAULT_CONFIG.track_blend)
+      : Number(source.track_blend),
+    background_transparent: source.background_transparent === undefined
+      ? DEFAULT_CONFIG.background_transparent
+      : source.background_transparent,
     entities: {
-      battery_charge: normalizeEntity(entitiesInput.battery_charge, DEFAULT_CONFIG.entities.battery_charge),
-      battery_discharge: normalizeEntity(entitiesInput.battery_discharge, DEFAULT_CONFIG.entities.battery_discharge),
-      summary_soc: normalizeEntity(entitiesInput.summary_soc, DEFAULT_CONFIG.entities.summary_soc),
-      summary_energy: normalizeEntity(entitiesInput.summary_energy, DEFAULT_CONFIG.entities.summary_energy),
-      summary_device_temperature: normalizeEntity(
-        entitiesInput.summary_device_temperature,
-        DEFAULT_CONFIG.entities.summary_device_temperature,
-      ),
-      battery1_soc: normalizeEntity(entitiesInput.battery1_soc, DEFAULT_CONFIG.entities.battery1_soc),
-      battery1_temp: normalizeEntity(entitiesInput.battery1_temp, DEFAULT_CONFIG.entities.battery1_temp),
-      battery1_voltage: normalizeEntity(entitiesInput.battery1_voltage, DEFAULT_CONFIG.entities.battery1_voltage),
+      battery_charge: normalizeEntity(entitiesInput.battery_charge),
+      battery_discharge: normalizeEntity(entitiesInput.battery_discharge),
+      summary_soc: normalizeEntity(entitiesInput.summary_soc),
+      summary_energy: normalizeEntity(entitiesInput.summary_energy),
+      summary_device_temperature: normalizeEntity(entitiesInput.summary_device_temperature),
+      battery1_soc: normalizeEntity(entitiesInput.battery1_soc),
+      battery1_temp: normalizeEntity(entitiesInput.battery1_temp),
+      battery1_voltage: normalizeEntity(entitiesInput.battery1_voltage),
       battery2_soc: batteryCount === 2
-        ? normalizeEntity(entitiesInput.battery2_soc, DEFAULT_CONFIG.entities.battery2_soc)
+        ? normalizeEntity(entitiesInput.battery2_soc)
         : normalizeOptionalEntity(entitiesInput.battery2_soc),
       battery2_temp: batteryCount === 2
-        ? normalizeEntity(entitiesInput.battery2_temp, DEFAULT_CONFIG.entities.battery2_temp)
+        ? normalizeEntity(entitiesInput.battery2_temp)
         : normalizeOptionalEntity(entitiesInput.battery2_temp),
       battery2_voltage: batteryCount === 2
-        ? normalizeEntity(entitiesInput.battery2_voltage, DEFAULT_CONFIG.entities.battery2_voltage)
+        ? normalizeEntity(entitiesInput.battery2_voltage)
         : normalizeOptionalEntity(entitiesInput.battery2_voltage),
     },
-    colors: mergeColorPresetTokens(
-      source.color_preset,
-      DEFAULT_CONFIG.colors,
-      normalizeColorOverrides(colorsInput),
-    ),
+    colors: {
+      background: normalizeColor(colorsInput.background, DEFAULT_CONFIG.colors.background),
+      ...mergeColorPresetTokens(
+        source.color_preset,
+        {},
+        normalizeColorOverrides(colorsInput),
+      ),
+    },
   };
 }
 
@@ -132,27 +130,11 @@ function validateIntegerRange(value, key, min, max) {
   }
 }
 
-function clampNumber(value, min, max, fallback) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) {
-    return fallback;
-  }
-  return Math.min(max, Math.max(min, n));
-}
-
-function clampInteger(value, min, max, fallback) {
-  const n = Number(value);
-  if (!Number.isInteger(n)) {
-    return fallback;
-  }
-  return Math.min(max, Math.max(min, n));
-}
-
 function validateColorPreset(value) {
   if (value === undefined) {
     return;
   }
-  if (!isKnownColorPreset(value)) {
+  if (typeof value !== "string" || !isKnownColorPreset(value)) {
     throw new Error("color_preset must be a supported preset name.");
   }
 }
@@ -164,9 +146,9 @@ function normalizeColor(value, fallback) {
   return value.trim();
 }
 
-function normalizeEntity(value, fallback) {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    return fallback;
+function normalizeEntity(value) {
+  if (typeof value !== "string") {
+    return "";
   }
   return value.trim();
 }

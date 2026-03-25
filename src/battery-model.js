@@ -1,13 +1,6 @@
 import { resolveEntityStatus } from "./_shared/availability.js";
 import { formatEntityStateValue } from "./_shared/entity-format.js";
 
-const DEFAULT_METRIC_ICONS = {
-  soc: "mdi:battery-medium",
-  energy: "mdi:home-battery-outline",
-  temperature: "mdi:thermometer",
-  voltage: "mdi:sine-wave",
-};
-
 export function collectRelevantEntities(config) {
   const entities = config?.entities || {};
   const ids = [
@@ -39,112 +32,58 @@ export function buildCardModel(config, hass) {
 
   return {
     summary: {
-      primary: buildMetricView(hass, entities.summary_soc, "soc", "Total state of charge"),
+      primary: buildMetricView(hass, entities.summary_soc),
       chips: [
-        buildMetricView(hass, entities.summary_energy, "energy", "Available energy"),
-        buildMetricView(
-          hass,
-          entities.summary_device_temperature,
-          "temperature",
-          "Device temperature",
-        ),
+        buildMetricView(hass, entities.summary_energy),
+        buildMetricView(hass, entities.summary_device_temperature),
       ],
     },
     battery1: {
-      primary: buildMetricView(hass, entities.battery1_soc, "soc", "Battery 1 state of charge"),
+      primary: buildMetricView(hass, entities.battery1_soc),
       chips: [
-        buildMetricView(hass, entities.battery1_voltage, "voltage", "Battery 1 total voltage"),
-        buildMetricView(hass, entities.battery1_temp, "temperature", "Battery 1 max cell temperature"),
+        buildMetricView(hass, entities.battery1_voltage),
+        buildMetricView(hass, entities.battery1_temp),
       ],
     },
     battery2: batteryCount === 2
       ? {
-        primary: buildMetricView(hass, entities.battery2_soc, "soc", "Battery 2 state of charge"),
+        primary: buildMetricView(hass, entities.battery2_soc),
         chips: [
-          buildMetricView(hass, entities.battery2_voltage, "voltage", "Battery 2 total voltage"),
-          buildMetricView(hass, entities.battery2_temp, "temperature", "Battery 2 max cell temperature"),
+          buildMetricView(hass, entities.battery2_voltage),
+          buildMetricView(hass, entities.battery2_temp),
         ],
       }
       : null,
   };
 }
 
-function buildMetricView(hass, entityId, kind, fallbackLabel) {
+function buildMetricView(hass, entityId) {
   const stateObj = entityId ? hass?.states?.[entityId] : null;
   const status = resolveEntityStatus(entityId, stateObj);
-  const friendlyName = stateObj?.attributes?.friendly_name || fallbackLabel;
+  const label = `${stateObj?.attributes?.friendly_name ?? ""}`.trim() || `${entityId ?? ""}`.trim();
   const value = formatMetricValue(hass, stateObj);
 
   return {
     entityId: status === "ready" ? entityId || "" : "",
-    icon: resolveMetricIcon(stateObj, kind),
+    stateObj: stateObj || null,
     value,
-    title: buildMetricTitle(friendlyName, fallbackLabel, value, status),
+    title: buildMetricTitle(label, value, status),
     available: status === "ready",
     configured: status !== "omitted",
     status,
   };
 }
 
-function buildMetricTitle(friendlyName, fallbackLabel, value, status) {
+function buildMetricTitle(label, value, status) {
   if (status === "ready") {
-    return `${friendlyName}: ${value}`;
+    return label ? `${label}: ${value}` : value;
   }
   if (status === "omitted") {
-    return fallbackLabel;
+    return "";
   }
-  return `${friendlyName}: unavailable`;
-}
-
-function resolveMetricIcon(stateObj, kind) {
-  const explicitIcon = `${stateObj?.attributes?.icon ?? ""}`.trim();
-  if (explicitIcon) {
-    return explicitIcon;
-  }
-  if (kind === "soc") {
-    return resolveSocIcon(stateObj?.state);
-  }
-  return DEFAULT_METRIC_ICONS[kind] || "";
-}
-
-function resolveSocIcon(rawState) {
-  const numeric = parseNumericState(rawState);
-  if (numeric === null) {
-    return DEFAULT_METRIC_ICONS.soc;
-  }
-
-  if (numeric >= 95) {
-    return "mdi:battery";
-  }
-  if (numeric <= 5) {
-    return "mdi:battery-outline";
-  }
-
-  const bucket = Math.min(90, Math.max(10, Math.round(numeric / 10) * 10));
-  return `mdi:battery-${bucket}`;
+  return label ? `${label}: unavailable` : "unavailable";
 }
 
 function formatMetricValue(hass, stateObj) {
   return formatEntityStateValue(hass, stateObj);
-}
-
-function parseNumericState(raw) {
-  const trimmed = `${raw ?? ""}`.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  const direct = Number(trimmed);
-  if (Number.isFinite(direct)) {
-    return direct;
-  }
-
-  const normalized = trimmed.replace(",", ".");
-  const match = normalized.match(/^-?\d+(?:\.\d+)?/);
-  if (!match) {
-    return null;
-  }
-
-  const parsed = Number(match[0]);
-  return Number.isFinite(parsed) ? parsed : null;
 }

@@ -6,6 +6,11 @@ The format is based on Keep a Changelog and this project uses Semantic Versionin
 
 ## [Unreleased]
 
+### Changed
+- Standardized the shared top-row layout tokens to a `4px` line gap and a `15px` / `500` primary metric baseline so Battery Bar aligns more closely with House Energy Bar and PowerFlow Bar in stacked layouts.
+- Moved the remaining shared metric/button styling tokens into the common layout token layer, including primary and chip spacing, focus ring styling, primary text rhythm, and icon tint/offset values.
+- Normalized chip text weight into the shared token layer and explicitly exposed `--icon-primary-color` on metric icons so the icon component inherits the card color path consistently.
+
 ## [1.3.0] - 2026-03-25
 
 ### Release Summary

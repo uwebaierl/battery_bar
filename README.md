@@ -9,6 +9,7 @@ Battery Bar is a compact Home Assistant Lovelace custom card that displays a sum
 
 - Summary-first battery overview with support for one or two battery columns
 - Primary SoC values with compact secondary metrics for energy, voltage, and temperature
+- Consistent metric typography and spacing for stacked use with PowerFlow Bar and House Energy Bar
 - Shared preset-based color themes with optional manual overrides
 - Built-in visual editor for layout, colors, and entities
 - Clickable values that open Home Assistant `more-info`

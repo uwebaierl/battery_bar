@@ -1,3 +1,8 @@
+import {
+  DEFAULT_BAR_HEIGHT_PX,
+  DEFAULT_RADIUS_PX,
+} from "./_shared/layout-tokens.js";
+
 export const CARD_ELEMENT_TAG = "battery-bar";
 export const CARD_TYPE = "custom:battery-bar";
 export const CARD_NAME = "Battery Bar";
@@ -6,8 +11,8 @@ export const DEFAULT_CONFIG = {
   type: CARD_TYPE,
   color_preset: "preset_1",
   battery_count: 2,
-  bar_height: 56,
-  corner_radius: 28,
+  bar_height: DEFAULT_BAR_HEIGHT_PX,
+  corner_radius: DEFAULT_RADIUS_PX,
   track_blend: 0.2,
   background_transparent: true,
   entities: {

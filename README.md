@@ -143,9 +143,13 @@ The card and visual editor no longer prefill entity ids.
 
 ## Development
 
-Run commands from `battery_bar/`:
+Run commands from this repository:
 
 ```bash
 npm run build
 npm run check:syntax
 ```
+
+The card repository is standalone. `src/_shared` contains the vendored shared helpers needed for a normal clone and build.
+
+For shared multi-card development, place the maintainer workspace as a sibling folder named `ha_custom_cards_workspace` or set `HA_CUSTOM_CARDS_WORKSPACE=/path/to/ha_custom_cards_workspace`. When the workspace is present, `npm run build` syncs `shared/card_core` into `src/_shared`, rebuilds `dist/battery_bar.js`, and refreshes the matching local test bundle.

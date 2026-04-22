@@ -12,9 +12,14 @@ export async function runCardBuild(options) {
 
   const srcRoot = path.join(projectRoot, "src");
   const distRoot = path.join(projectRoot, "dist");
-  const workspaceSharedRoot = path.resolve(projectRoot, "..", "shared", "card_core");
+  const workspaceRoot = findWorkspaceRoot(projectRoot);
+  const workspaceSharedRoot = workspaceRoot
+    ? path.join(workspaceRoot, "shared", "card_core")
+    : null;
   const localSharedRoot = path.join(srcRoot, "_shared");
-  const localTestScript = path.resolve(projectRoot, "..", "local_test", "build-test-bundles.mjs");
+  const localTestScript = workspaceRoot
+    ? path.join(workspaceRoot, "local_test", "build-test-bundles.mjs")
+    : null;
   const entryFile = path.join(srcRoot, "index.js");
   const visited = new Set();
   const orderedFiles = [];
@@ -33,10 +38,33 @@ export async function runCardBuild(options) {
 }
 
 function syncSharedCore(workspaceSharedRoot, localSharedRoot) {
-  if (!fs.existsSync(workspaceSharedRoot)) {
+  if (!workspaceSharedRoot || !fs.existsSync(workspaceSharedRoot)) {
     return;
   }
   copyDirectory(workspaceSharedRoot, localSharedRoot);
+}
+
+function findWorkspaceRoot(projectRoot) {
+  for (const candidate of workspaceRootCandidates(projectRoot)) {
+    if (
+      fs.existsSync(path.join(candidate, "shared", "card_core"))
+      || fs.existsSync(path.join(candidate, "local_test", "build-test-bundles.mjs"))
+    ) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function workspaceRootCandidates(projectRoot) {
+  const candidates = [];
+  if (process.env.HA_CUSTOM_CARDS_WORKSPACE) {
+    candidates.push(path.resolve(process.env.HA_CUSTOM_CARDS_WORKSPACE));
+  }
+  candidates.push(path.resolve(projectRoot, "..", "ha_custom_cards_workspace"));
+  candidates.push(path.resolve(projectRoot, ".."));
+
+  return [...new Set(candidates)];
 }
 
 function copyDirectory(sourceDir, targetDir) {
@@ -57,7 +85,7 @@ function copyDirectory(sourceDir, targetDir) {
 }
 
 function syncLocalTestBundle(localTestScript, projectRoot, bundleKey) {
-  if (!fs.existsSync(localTestScript)) {
+  if (!localTestScript || !fs.existsSync(localTestScript)) {
     return;
   }
 
